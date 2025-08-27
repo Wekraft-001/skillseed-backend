@@ -78,6 +78,29 @@ export class SchoolDashboardService {
     }
   }
 
+  async getMyProfile(schoolId: string): Promise<School> {
+    try {
+      this.logger.log(`Fetching mentor profile for mentor: ${schoolId}`);
+
+      const school = await this.schoolModel
+        .findById(schoolId)
+        // .populate('createdBy')
+        .lean();
+
+      if (!school) {
+        throw new BadRequestException('Mentor not found.');
+      }
+
+      return school;
+    } catch (error) {
+      this.logger.error(
+        `Error fetching mentor profile for mentor: ${schoolId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
   async registerStudentBySchoolAdmin(
     createStudentDto: CreateStudentDto,
     currentUser: User,

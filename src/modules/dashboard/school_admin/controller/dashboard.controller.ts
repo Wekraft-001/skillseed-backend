@@ -41,9 +41,18 @@ export class SchoolDashboardController {
     return this.schoolDashboardService.getDashboardData(currentUser);
   }
 
+  @Get('profile')
+  @HttpCode(HttpStatus.OK)
+  async getProfile(@Request() req) {
+    const schoolId = req.user._id;
+    return this.schoolDashboardService.getMyProfile(schoolId);
+  }
+
   @Post('register-student')
   @UseInterceptors(FileInterceptor('image'))
-  @ApiOperation({ summary: 'Register a student under the current school (admin)' })
+  @ApiOperation({
+    summary: 'Register a student under the current school (admin)',
+  })
   @ApiResponse({ status: 201, description: 'Student registered' })
   async registerStudent(
     @UploadedFile() image: Express.Multer.File,
