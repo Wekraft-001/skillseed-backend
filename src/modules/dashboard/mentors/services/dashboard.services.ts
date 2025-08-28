@@ -116,14 +116,32 @@ export class MentorDashboardService {
     },
     description?: string,
   ) {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
     const uploadedCredentials = [];
+
+    // Validate files are provided
+    if (!files.governmentId?.length && !files.professionalCredentials?.length) {
+      throw new BadRequestException('At least one credential file must be uploaded');
+    }
 
     // Handle Government ID
     if (files.governmentId?.length > 0) {
       const file = files.governmentId[0];
+      
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        throw new BadRequestException(`Government ID file size exceeds maximum allowed (5MB)`);
+      }
+      
+      // Validate file type
+      if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        throw new BadRequestException(`Government ID must be a PDF, JPEG, or PNG file`);
+      }
+
       const fileKey = `mentors/${user._id}/credentials/government-id/${file.originalname}`;
 
-      // Upload to S3
+      // Upload to Azure
       const fileUrl = await uploadDocumentToAzure(file, fileKey);
 
       // Save to database
@@ -142,9 +160,20 @@ export class MentorDashboardService {
     // Handle Professional Credentials
     if (files.professionalCredentials?.length > 0) {
       const file = files.professionalCredentials[0];
+      
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        throw new BadRequestException(`Professional credentials file size exceeds maximum allowed (5MB)`);
+      }
+      
+      // Validate file type
+      if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+        throw new BadRequestException(`Professional credentials must be a PDF, JPEG, or PNG file`);
+      }
+      
       const fileKey = `mentors/${user._id}/credentials/professional/${file.originalname}`;
 
-      // Upload to S3
+      // Upload to Azure
       const fileUrl = await uploadDocumentToAzure(file, fileKey);
 
       // Save to database
@@ -160,10 +189,7 @@ export class MentorDashboardService {
       uploadedCredentials.push(credential);
     }
 
-    if (uploadedCredentials.length === 0) {
-      throw new BadRequestException('No files were uploaded');
-    }
-
+    // Return uploaded credentials
     return {
       message: 'Credentials uploaded successfully',
       credentials: uploadedCredentials,

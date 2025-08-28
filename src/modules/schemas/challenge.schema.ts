@@ -1,0 +1,53 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+import { ChallengeCategory, ChallengeType } from '../content/dtos';
+
+export type ChallengeDocument = Challenge & Document;
+
+@Schema({ timestamps: true })
+export class Challenge {
+  @Prop({ required: true, index: true })
+  title: string;
+
+  @Prop({ required: true })
+  description: string;
+
+  @Prop({ 
+    type: String, 
+    enum: ChallengeType, 
+    required: true,
+    index: true 
+  })
+  type: ChallengeType;
+
+  @Prop({ 
+    type: String, 
+    enum: ChallengeCategory, 
+    required: true,
+    index: true
+  })
+  category: ChallengeCategory;
+
+  @Prop({ required: true })
+  difficultyLevel: string;
+
+  @Prop({ required: true })
+  estimatedTime: string;
+
+  @Prop({ type: [String], required: false })
+  materialsNeeded?: string[];
+
+  @Prop({ type: [String], required: true })
+  instructions: string[];
+
+  @Prop({ type: String, required: false })
+  imageUrl?: string;
+
+  @Prop({ type: String, required: false })
+  videoTutorialUrl?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  createdBy: Types.ObjectId;
+}
+
+export const ChallengeSchema = SchemaFactory.createForClass(Challenge);

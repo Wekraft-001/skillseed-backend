@@ -68,12 +68,12 @@ export class MentorDashboardController {
         governmentId: {
           type: 'string',
           format: 'binary',
-          description: 'Government ID document (PDF)',
+          description: 'Government ID document (PDF, JPG, or PNG) - Max 5MB',
         },
         professionalCredentials: {
           type: 'string',
           format: 'binary',
-          description: 'Professional credentials document (PDF)',
+          description: 'Professional credentials document (PDF, JPG, or PNG) - Max 5MB',
         },
         description: {
           type: 'string',
@@ -86,15 +86,7 @@ export class MentorDashboardController {
   @ApiResponse({ status: 400, description: 'Invalid file type or size' })
   async uploadCredentials(
     @CurrentUser() user: User,
-    @UploadedFiles(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: 'application/pdf' }),
-        ],
-      }),
-    )
-    files: {
+    @UploadedFiles() files: {
       governmentId?: Express.Multer.File[];
       professionalCredentials?: Express.Multer.File[];
     },

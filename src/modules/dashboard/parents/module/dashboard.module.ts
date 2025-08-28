@@ -17,6 +17,9 @@ import {
   Transaction,
   TransactionSchema,
 } from 'src/modules/schemas/transaction.schema';
+import { ParentLearningActivitiesController } from '../controllers/learning-activities.controller';
+import { ParentLearningActivitiesService } from '../services/learning-activities.service';
+import { ContentModule } from 'src/modules/content/content.module';
 
 @Module({
   imports: [
@@ -31,9 +34,10 @@ import {
     forwardRef(() => SubscriptionModule),
     forwardRef(() => PaymentModule),
     forwardRef(() => AiModule),
+    ContentModule,
   ],
-  controllers: [ParentDashboardController],
-  providers: [ParentDashboardService],
+  controllers: [ParentDashboardController, ParentLearningActivitiesController],
+  providers: [ParentDashboardService, ParentLearningActivitiesService],
   exports: [ParentDashboardService],
 })
 export class ParentDashboardModule {}

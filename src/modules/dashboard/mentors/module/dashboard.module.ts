@@ -8,6 +8,9 @@ import {
   MentorCredential,
   MentorCredentialSchema,
 } from 'src/modules/schemas/mentor-credential.schema';
+import { MentorLearningActivitiesController } from '../controllers/learning-activities.controller';
+import { MentorLearningActivitiesService } from '../services/learning-activities.service';
+import { ContentModule } from 'src/modules/content/content.module';
 
 @Module({
   imports: [
@@ -17,8 +20,9 @@ import {
       { name: MentorCredential.name, schema: MentorCredentialSchema },
     ]),
     LoggerModule,
+    ContentModule,
   ],
-  controllers: [MentorDashboardController],
-  providers: [MentorDashboardService],
+  controllers: [MentorDashboardController, MentorLearningActivitiesController],
+  providers: [MentorDashboardService, MentorLearningActivitiesService],
 })
 export class MentorDashboardModule {}

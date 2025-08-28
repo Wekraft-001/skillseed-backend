@@ -92,6 +92,13 @@ export async function uploadDocumentToAzure(
     case '.txt':
       contentType = 'text/plain';
       break;
+    case '.jpg':
+    case '.jpeg':
+      contentType = 'image/jpeg';
+      break;
+    case '.png':
+      contentType = 'image/png';
+      break;
     // add more as needed
   }
 

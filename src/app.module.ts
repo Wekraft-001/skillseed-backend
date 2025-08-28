@@ -21,6 +21,7 @@ import {
   SchoolModule,
   TransactionModule,
   MentorModule,
+  MentorCredentialModule,
 } from './modules/dashboard/super_admin/modules/index';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SubscriptionModule } from './subscription/subscription.module';
@@ -30,6 +31,8 @@ import { SchoolDashboardModule } from './modules/dashboard/school_admin/modules/
 import { ParentDashboardModule } from './modules/dashboard/parents/module/dashboard.module';
 import { MentorDashboardModule } from './modules/dashboard/mentors/module/dashboard.module';
 import { StudentDashboardModule } from './modules/dashboard/student/module/dashboard.module';
+import { ContentModule } from './modules/content/content.module';
+import { CommunityModule } from './modules/community/community.module';
 
 @Module({
   imports: [
@@ -62,10 +65,13 @@ import { StudentDashboardModule } from './modules/dashboard/student/module/dashb
     MentorDashboardModule,
     StudentDashboardModule,
     DashboardModule,
+    MentorCredentialModule,
     SubscriptionModule,
     RedisModule,
     TransactionModule,
     PaymentModule,
+    ContentModule,
+    CommunityModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
