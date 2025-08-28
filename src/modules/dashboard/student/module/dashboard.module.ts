@@ -6,12 +6,17 @@ import {
   EducationalContent, 
   EducationalContentSchema,
   User,
-  UserSchema
+  UserSchema,
+  Challenge,
+  ChallengeSchema
 } from 'src/modules/schemas';
 import { LoggerModule } from 'src/common/logger/logger.module';
 import { AiModule } from 'src/modules/ai/ai.module';
 import { StudentDashboardController } from '../controller/dashboard.controller';
 import { StudentDashboardService } from '../services/dashboard.service';
+import { StudentChallengesController } from '../controllers/challenges.controller';
+import { StudentChallengesService } from '../services/challenges.service';
+import { ContentModule } from 'src/modules/content/content.module';
 
 @Module({
   imports: [
@@ -19,12 +24,14 @@ import { StudentDashboardService } from '../services/dashboard.service';
       { name: User.name, schema: UserSchema },
       { name: CareerQuiz.name, schema: CareerQuizSchema },
       { name: EducationalContent.name, schema: EducationalContentSchema },
+      { name: Challenge.name, schema: ChallengeSchema },
     ]),
     LoggerModule,
     AiModule,
+    ContentModule,
   ],
-  controllers: [StudentDashboardController],
-  providers: [StudentDashboardService],
+  controllers: [StudentDashboardController, StudentChallengesController],
+  providers: [StudentDashboardService, StudentChallengesService],
   exports: [StudentDashboardService],
 })
 export class StudentDashboardModule {}

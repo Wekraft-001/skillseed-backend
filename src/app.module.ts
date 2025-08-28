@@ -30,6 +30,7 @@ import { SchoolDashboardModule } from './modules/dashboard/school_admin/modules/
 import { ParentDashboardModule } from './modules/dashboard/parents/module/dashboard.module';
 import { MentorDashboardModule } from './modules/dashboard/mentors/module/dashboard.module';
 import { StudentDashboardModule } from './modules/dashboard/student/module/dashboard.module';
+import { ContentModule } from './modules/content/content.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { StudentDashboardModule } from './modules/dashboard/student/module/dashb
     RedisModule,
     TransactionModule,
     PaymentModule,
+    ContentModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
