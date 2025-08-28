@@ -31,6 +31,7 @@ import { ParentDashboardModule } from './modules/dashboard/parents/module/dashbo
 import { MentorDashboardModule } from './modules/dashboard/mentors/module/dashboard.module';
 import { StudentDashboardModule } from './modules/dashboard/student/module/dashboard.module';
 import { ContentModule } from './modules/content/content.module';
+import { CommunityModule } from './modules/community/community.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { ContentModule } from './modules/content/content.module';
     TransactionModule,
     PaymentModule,
     ContentModule,
+    CommunityModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
