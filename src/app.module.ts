@@ -21,6 +21,7 @@ import {
   SchoolModule,
   TransactionModule,
   MentorModule,
+  MentorCredentialModule,
 } from './modules/dashboard/super_admin/modules/index';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SubscriptionModule } from './subscription/subscription.module';
@@ -64,6 +65,7 @@ import { CommunityModule } from './modules/community/community.module';
     MentorDashboardModule,
     StudentDashboardModule,
     DashboardModule,
+    MentorCredentialModule,
     SubscriptionModule,
     RedisModule,
     TransactionModule,

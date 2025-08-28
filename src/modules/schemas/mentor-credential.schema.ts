@@ -29,6 +29,9 @@ export class MentorCredential {
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   verifiedBy: User;
+  
+  @Prop()
+  rejectionReason: string;
 }
 
 export const MentorCredentialSchema = SchemaFactory.createForClass(MentorCredential);

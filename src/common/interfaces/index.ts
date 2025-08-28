@@ -21,3 +21,5 @@ export * from './register-mentor.dto';
 export * from './auth-token-response.dto';
 export * from './renew-school-transaction.dto';
 export * from './parent-transaction.dto';
+export * from './mentor-credentials.dto';
+export * from './verify-credential.dto';

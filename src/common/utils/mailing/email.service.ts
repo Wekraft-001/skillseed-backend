@@ -110,4 +110,57 @@ export class EmailService {
       console.log('❌ Failed to send expiration email:', error);
     }
   }
+
+  async sendCredentialApprovedEmail(email: string, firstName: string, credentialType: string) {
+    const credentialName = credentialType === 'government_id' ? 'Government ID' : 'Professional Credentials';
+    
+    const mailOptions = {
+      from: process.env.MAIL_FROM,
+      to: email,
+      subject: 'Your Credentials Have Been Approved',
+      html: `
+      <p>Hi ${firstName},</p>
+      <p>Great news! Your ${credentialName} has been <strong>approved</strong> by our team.</p>
+      <p>Your profile is now fully verified, which means you can access all mentor features on Skillseed.</p>
+      <p>Thank you for your cooperation during the verification process.</p>
+      <p>If you have any questions or need further assistance, please don't hesitate to contact us.</p>
+      <p>Best regards,</p>
+      <p><strong>The Skillseed Team</strong></p>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Credential approval email sent:', info.response);
+    } catch (error) {
+      console.error('❌ Failed to send credential approval email:', error);
+    }
+  }
+
+  async sendCredentialRejectedEmail(email: string, firstName: string, credentialType: string, rejectionReason: string) {
+    const credentialName = credentialType === 'government_id' ? 'Government ID' : 'Professional Credentials';
+    
+    const mailOptions = {
+      from: process.env.MAIL_FROM,
+      to: email,
+      subject: 'Action Required: Your Credentials Were Not Approved',
+      html: `
+      <p>Hi ${firstName},</p>
+      <p>We've reviewed your ${credentialName} and unfortunately, we were unable to approve it at this time.</p>
+      <p><strong>Reason:</strong> ${rejectionReason || 'The submitted credentials did not meet our verification requirements.'}</p>
+      <p>Please log in to your account and upload a new document that addresses the issues mentioned above.</p>
+      <p>If you have any questions or need further clarification, please contact our support team for assistance.</p>
+      <p>Thank you for your understanding.</p>
+      <p>Best regards,</p>
+      <p><strong>The Skillseed Team</strong></p>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Credential rejection email sent:', info.response);
+    } catch (error) {
+      console.error('❌ Failed to send credential rejection email:', error);
+    }
+  }
 }
