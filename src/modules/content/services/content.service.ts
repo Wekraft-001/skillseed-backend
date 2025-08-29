@@ -4,8 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { Content, ContentDocument, Challenge, ChallengeDocument, User, UserDocument } from 'src/modules/schemas';
 import { CreateContentDto, FilterContentDto, TargetAudience, CreateChallengeDto } from '../dtos';
@@ -17,6 +17,7 @@ export class ContentService {
     @InjectModel(Content.name) private contentModel: Model<ContentDocument>,
     @InjectModel(Challenge.name) private challengeModel: Model<ChallengeDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectConnection() private connection: Connection,
     private readonly logger: LoggerService,
   ) {
     this.logger.setContext('ContentService');
@@ -56,6 +57,16 @@ export class ContentService {
       
       if (user.role !== UserRole.SUPER_ADMIN) {
         throw new ForbiddenException('Only super admins can create challenges');
+      }
+      
+      // Validate if the category exists
+      try {
+        const categoryExists = await this.connection.models.ChallengeCategory.findById(createChallengeDto.categoryId);
+        if (!categoryExists) {
+          throw new NotFoundException(`Challenge category with ID ${createChallengeDto.categoryId} not found`);
+        }
+      } catch (error) {
+        throw new BadRequestException(`Invalid category ID: ${error.message}`);
       }
 
       const newChallenge = new this.challengeModel({

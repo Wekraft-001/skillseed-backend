@@ -12,7 +12,7 @@ import { UserRole } from 'src/common/interfaces';
 import { CurrentUser } from 'src/common/decorators';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { StudentChallengesService } from '../services/challenges.service';
-import { FilterContentDto, ChallengeType, ChallengeCategory } from 'src/modules/content/dtos';
+import { FilterContentDto, ChallengeType } from 'src/modules/content/dtos';
 import { User } from 'src/modules/schemas';
 
 @Controller('student/dashboard/challenges')
@@ -27,7 +27,7 @@ export class StudentChallengesController {
   @Get()
   @ApiOperation({ summary: 'Get challenges for students' })
   @ApiQuery({ name: 'type', enum: ChallengeType, required: false })
-  @ApiQuery({ name: 'category', enum: ChallengeCategory, required: false })
+  @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'search', required: false })
   async getChallenges(
     @CurrentUser() user: User,

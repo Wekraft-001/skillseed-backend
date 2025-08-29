@@ -1,19 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsEnum, IsMongoId, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export enum ChallengeType {
   PROJECT = 'project',
   EXPERIMENT = 'experiment',
   ACTIVITY = 'activity'
-}
-
-export enum ChallengeCategory {
-  SCIENCE = 'science',
-  TECHNOLOGY = 'technology',
-  ENGINEERING = 'engineering',
-  ARTS = 'arts',
-  MATHEMATICS = 'mathematics',
-  GENERAL = 'general',
 }
 
 export class CreateChallengeDto {
@@ -32,10 +23,10 @@ export class CreateChallengeDto {
   @IsNotEmpty()
   type: ChallengeType;
 
-  @ApiProperty({ enum: ChallengeCategory, description: 'Category of challenge', example: ChallengeCategory.ENGINEERING })
-  @IsEnum(ChallengeCategory)
+  @ApiProperty({ description: 'ID of the challenge category', example: '507f1f77bcf86cd799439011' })
+  @IsMongoId()
   @IsNotEmpty()
-  category: ChallengeCategory;
+  categoryId: string;
 
   @ApiProperty({ description: 'Difficulty level', example: 'Beginner', required: true })
   @IsString()
