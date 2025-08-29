@@ -15,7 +15,7 @@ import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { StudentCommunitiesService } from '../services/communities.service';
 import { FilterCommunityDto } from 'src/modules/community/dtos';
 import { User } from 'src/modules/schemas';
-import { CommunityCategory } from 'src/modules/schemas/community.schema';
+import { AgeGroup, CommunityCategory } from 'src/modules/schemas/community.schema';
 
 @Controller('student/dashboard/communities')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,8 +28,10 @@ export class StudentCommunitiesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all available communities for students' })
-  @ApiQuery({ name: 'category', enum: CommunityCategory, required: false })
-  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'category', enum: CommunityCategory, required: false, description: 'Filter by legacy category (deprecated)' })
+  @ApiQuery({ name: 'challengeCategory', required: false, description: 'Filter by challenge category ID' })
+  @ApiQuery({ name: 'ageGroup', enum: AgeGroup, required: false, description: 'Filter by age group' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by name or description' })
   async getAllCommunities(
     @Query() filterDto: FilterCommunityDto,
   ) {

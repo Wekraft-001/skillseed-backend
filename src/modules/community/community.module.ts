@@ -1,7 +1,14 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'src/common/logger/logger.module';
-import { Community, CommunitySchema, User, UserSchema } from '../schemas';
+import { 
+  ChallengeCategory, 
+  ChallengeCategorySchema, 
+  Community, 
+  CommunitySchema, 
+  User, 
+  UserSchema 
+} from '../schemas';
 import { CommunityController } from './controllers/community.controller';
 import { CommunityService } from './services/community.service';
 import { SeedCommunitiesService } from './commands/seed-communities.command';
@@ -11,6 +18,7 @@ import { SeedCommunitiesService } from './commands/seed-communities.command';
     MongooseModule.forFeature([
       { name: Community.name, schema: CommunitySchema },
       { name: User.name, schema: UserSchema },
+      { name: ChallengeCategory.name, schema: ChallengeCategorySchema },
     ]),
     LoggerModule,
   ],

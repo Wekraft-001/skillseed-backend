@@ -7,7 +7,14 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { Community, CommunityDocument, User, UserDocument } from 'src/modules/schemas';
+import { 
+  ChallengeCategory, 
+  ChallengeCategoryDocument, 
+  Community, 
+  CommunityDocument, 
+  User, 
+  UserDocument 
+} from 'src/modules/schemas';
 import { CreateCommunityDto, FilterCommunityDto } from '../dtos';
 import { UserRole } from 'src/common/interfaces';
 
@@ -16,6 +23,7 @@ export class CommunityService {
   constructor(
     @InjectModel(Community.name) private communityModel: Model<CommunityDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(ChallengeCategory.name) private challengeCategoryModel: Model<ChallengeCategoryDocument>,
     private readonly logger: LoggerService,
   ) {
     this.logger.setContext('CommunityService');
@@ -31,6 +39,12 @@ export class CommunityService {
       
       if (user.role !== UserRole.SUPER_ADMIN) {
         throw new ForbiddenException('Only super admins can create communities');
+      }
+
+      // Validate challenge category exists
+      const challengeCategory = await this.challengeCategoryModel.findById(createCommunityDto.challengeCategory);
+      if (!challengeCategory) {
+        throw new BadRequestException(`Challenge category with ID ${createCommunityDto.challengeCategory} not found`);
       }
 
       const newCommunity = new this.communityModel({
@@ -53,6 +67,14 @@ export class CommunityService {
       
       if (filterDto.category) {
         query.category = filterDto.category;
+      }
+      
+      if (filterDto.challengeCategory) {
+        query.challengeCategory = new Types.ObjectId(filterDto.challengeCategory);
+      }
+      
+      if (filterDto.ageGroup) {
+        query.ageGroup = filterDto.ageGroup;
       }
       
       if (filterDto.search) {
