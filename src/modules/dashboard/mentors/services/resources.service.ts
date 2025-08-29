@@ -1,12 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { ContentService } from 'src/modules/content/services/content.service';
-import { FilterContentDto } from 'src/modules/content/dtos';
+import { FilterContentDto, FilterContentWithoutCategoryDto } from 'src/modules/content/dtos';
 
 @Injectable()
 export class MentorResourcesService {
   constructor(private readonly contentService: ContentService) {}
 
-  async getResources(userId: string, filterDto: FilterContentDto) {
-    return this.contentService.getContentForUser(userId, filterDto);
+  async getResources(userId: string, filterDto: FilterContentWithoutCategoryDto) {
+    // Convert to standard filter DTO but without category
+    const standardFilterDto: FilterContentDto = {
+      type: filterDto.type,
+      search: filterDto.search
+    };
+    
+    return this.contentService.getContentForUser(userId, standardFilterDto);
   }
 }

@@ -11,7 +11,7 @@ import { UserRole } from 'src/common/interfaces';
 import { CurrentUser } from 'src/common/decorators';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SchoolContentService } from '../services/content.service';
-import { FilterContentDto, ContentType, ContentCategory } from 'src/modules/content/dtos';
+import { FilterContentWithoutCategoryDto, ContentType } from 'src/modules/content/dtos';
 import { User } from 'src/modules/schemas';
 
 @Controller('school/dashboard/content')
@@ -26,11 +26,10 @@ export class SchoolContentController {
   @Get()
   @ApiOperation({ summary: 'Get content uploaded by admin for schools' })
   @ApiQuery({ name: 'type', enum: ContentType, required: false })
-  @ApiQuery({ name: 'category', enum: ContentCategory, required: false })
   @ApiQuery({ name: 'search', required: false })
   async getContent(
     @CurrentUser() user: User,
-    @Query() filterDto: FilterContentDto,
+    @Query() filterDto: FilterContentWithoutCategoryDto,
   ) {
     return this.contentService.getContent((user as any)._id, filterDto);
   }

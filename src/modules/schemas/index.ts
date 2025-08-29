@@ -7,4 +7,5 @@ export * from './school.schema';
 export * from './mentor.schema';
 export * from './content.schema';
 export * from './challenge.schema';
+export * from './challenge-category.schema';
 export * from './community.schema';

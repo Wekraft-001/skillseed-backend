@@ -6,23 +6,28 @@ import {
   ContentSchema, 
   Challenge, 
   ChallengeSchema, 
+  ChallengeCategory,
+  ChallengeCategorySchema,
   User, 
   UserSchema 
 } from '../schemas';
 import { ContentController } from './controllers/content.controller';
+import { ChallengeCategoryController } from './controllers/challenge-category.controller';
 import { ContentService } from './services/content.service';
+import { ChallengeCategoryService } from './services/challenge-category.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Content.name, schema: ContentSchema },
       { name: Challenge.name, schema: ChallengeSchema },
+      { name: ChallengeCategory.name, schema: ChallengeCategorySchema },
       { name: User.name, schema: UserSchema },
     ]),
     LoggerModule,
   ],
-  controllers: [ContentController],
-  providers: [ContentService],
-  exports: [ContentService],
+  controllers: [ContentController, ChallengeCategoryController],
+  providers: [ContentService, ChallengeCategoryService],
+  exports: [ContentService, ChallengeCategoryService],
 })
 export class ContentModule {}
