@@ -11,7 +11,7 @@ import { UserRole } from 'src/common/interfaces';
 import { CurrentUser } from 'src/common/decorators';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { MentorResourcesService } from '../services/resources.service';
-import { FilterContentDto, ContentType, ContentCategory } from 'src/modules/content/dtos';
+import { FilterContentWithoutCategoryDto, ContentType } from 'src/modules/content/dtos';
 import { User } from 'src/modules/schemas';
 
 @Controller('mentor/dashboard/resources')
@@ -26,11 +26,10 @@ export class MentorResourcesController {
   @Get()
   @ApiOperation({ summary: 'Get resources for mentors (formerly learning activities)' })
   @ApiQuery({ name: 'type', enum: ContentType, required: false })
-  @ApiQuery({ name: 'category', enum: ContentCategory, required: false })
   @ApiQuery({ name: 'search', required: false })
   async getResources(
     @CurrentUser() user: User,
-    @Query() filterDto: FilterContentDto,
+    @Query() filterDto: FilterContentWithoutCategoryDto,
   ) {
     return this.resourcesService.getResources((user as any)._id, filterDto);
   }
