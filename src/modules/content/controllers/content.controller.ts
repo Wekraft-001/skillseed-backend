@@ -84,6 +84,20 @@ export class ContentController {
     return this.contentService.getChallengesForStudent((user as any)._id, filterDto);
   }
 
+  @Get('challenges/school')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get challenges for school admins' })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getChallengesForSchool(
+    @CurrentUser() user: User,
+    @Query() filterDto: FilterContentDto,
+  ) {
+    return this.contentService.getChallengesForSchool((user as any)._id, filterDto);
+  }
+
   @Get('challenges/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)

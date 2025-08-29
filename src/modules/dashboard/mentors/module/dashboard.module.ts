@@ -10,6 +10,8 @@ import {
 } from 'src/modules/schemas/mentor-credential.schema';
 import { MentorLearningActivitiesController } from '../controllers/learning-activities.controller';
 import { MentorLearningActivitiesService } from '../services/learning-activities.service';
+import { MentorResourcesController } from '../controllers/resources.controller';
+import { MentorResourcesService } from '../services/resources.service';
 import { ContentModule } from 'src/modules/content/content.module';
 
 @Module({
@@ -22,7 +24,7 @@ import { ContentModule } from 'src/modules/content/content.module';
     LoggerModule,
     ContentModule,
   ],
-  controllers: [MentorDashboardController, MentorLearningActivitiesController],
-  providers: [MentorDashboardService, MentorLearningActivitiesService],
+  controllers: [MentorDashboardController, MentorLearningActivitiesController, MentorResourcesController],
+  providers: [MentorDashboardService, MentorLearningActivitiesService, MentorResourcesService],
 })
 export class MentorDashboardModule {}

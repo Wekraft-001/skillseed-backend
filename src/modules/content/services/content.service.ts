@@ -170,6 +170,42 @@ export class ContentService {
       throw error;
     }
   }
+  
+  async getChallengesForSchool(userId: string, filterDto: FilterContentDto) {
+    try {
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== UserRole.SCHOOL_ADMIN) {
+        throw new ForbiddenException('Only school admins can access this resource');
+      }
+
+      // Build query based on filters
+      const query: any = {};
+      
+      if (filterDto.type) {
+        query.type = filterDto.type;
+      }
+      
+      if (filterDto.category) {
+        query.category = filterDto.category;
+      }
+      
+      if (filterDto.search) {
+        query.$or = [
+          { title: { $regex: filterDto.search, $options: 'i' } },
+          { description: { $regex: filterDto.search, $options: 'i' } },
+        ];
+      }
+
+      return await this.challengeModel.find(query).sort({ createdAt: -1 }).exec();
+    } catch (error) {
+      this.logger.error(`Error getting challenges for school: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 
   async getChallengeById(challengeId: string) {
     try {
