@@ -11,6 +11,12 @@ export class ChallengeCategory {
   @Prop()
   description: string;
 
+  @Prop()
+  icon: string;
+
+  @Prop()
+  colorTheme: string;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
   createdBy: MongooseSchema.Types.ObjectId;
 }
