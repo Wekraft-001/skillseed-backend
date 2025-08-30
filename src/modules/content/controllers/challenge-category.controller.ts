@@ -12,7 +12,7 @@ import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from 'src/common/interfaces';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 import { ChallengeCategoryService } from '../services/challenge-category.service';
 import { CreateChallengeCategoryDto, UpdateChallengeCategoryDto } from '../dtos';
 import { CurrentUser } from 'src/common/decorators';
@@ -27,6 +27,10 @@ export class ChallengeCategoryController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new challenge category (Super Admin only)' })
+  @ApiBody({ 
+    type: CreateChallengeCategoryDto,
+    description: 'Create a new challenge category with name, description, icon, and color theme'
+  })
   @ApiResponse({ status: 201, description: 'The challenge category has been successfully created.' })
   @ApiResponse({ status: 400, description: 'Bad request, validation error or category already exists.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -54,6 +58,10 @@ export class ChallengeCategoryController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update a challenge category (Super Admin only)' })
+  @ApiBody({ 
+    type: UpdateChallengeCategoryDto,
+    description: 'Update a challenge category with name, description, icon, and color theme'
+  })
   @ApiResponse({ status: 200, description: 'The challenge category has been successfully updated.' })
   @ApiResponse({ status: 400, description: 'Bad request, validation error or category name already exists.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
