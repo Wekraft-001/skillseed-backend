@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   UploadedFile,
   UseGuards,
@@ -43,7 +44,8 @@ export class SchoolController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Onboard a new school (admin only)',
-    description: 'This endpoint allows the super admin to onboard a new school. The school will be created with PENDING payment status.',
+    description:
+      'This endpoint allows the super admin to onboard a new school. The school will be created with PENDING payment status.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -51,65 +53,76 @@ export class SchoolController {
     schema: {
       type: 'object',
       properties: {
-        schoolName: { 
-          type: 'string', 
+        schoolName: {
+          type: 'string',
           description: 'Name of the school',
-          example: 'St. Mary International School'
+          example: 'St. Mary International School',
         },
-        schoolType: { 
-          type: 'string', 
-          description: 'Type of school (e.g., Primary, Secondary, International)',
-          example: 'International'
+        schoolType: {
+          type: 'string',
+          description:
+            'Type of school (e.g., Primary, Secondary, International)',
+          example: 'International',
         },
-        schoolContactPerson: { 
-          type: 'string', 
+        schoolContactPerson: {
+          type: 'string',
           description: 'Name of the main contact person',
-          example: 'John Doe'
+          example: 'John Doe',
         },
-        email: { 
-          type: 'string', 
+        email: {
+          type: 'string',
           format: 'email',
           description: 'School email address',
-          example: 'admin@stmaryschool.com'
+          example: 'admin@stmaryschool.com',
         },
-        address: { 
-          type: 'string', 
+        address: {
+          type: 'string',
           description: 'Physical address of the school',
-          example: '123 Education Street'
+          example: '123 Education Street',
         },
-        city: { 
-          type: 'string', 
+        city: {
+          type: 'string',
           description: 'City where school is located',
-          example: 'Kigali'
+          example: 'Kigali',
         },
-        country: { 
-          type: 'string', 
+        country: {
+          type: 'string',
           description: 'Country where school is located',
-          example: 'Rwanda'
+          example: 'Rwanda',
         },
-        phoneNumber: { 
-          type: 'string', 
+        phoneNumber: {
+          type: 'string',
           description: 'School phone number',
-          example: '+250788123456'
+          example: '+250788123456',
         },
-        logo: { 
-          type: 'string', 
+        logo: {
+          type: 'string',
           format: 'binary',
-          description: 'School logo image file (optional)'
+          description: 'School logo image file (optional)',
         },
-        role: { 
-          type: 'string', 
+        role: {
+          type: 'string',
           enum: ['school_admin'],
           description: 'Role for the school (defaults to school_admin)',
-          example: 'school_admin'
+          example: 'school_admin',
         },
-        password: { 
-          type: 'string', 
-          description: 'Password for school admin (optional - will be auto-generated if not provided)'
-        }
+        password: {
+          type: 'string',
+          description:
+            'Password for school admin (optional - will be auto-generated if not provided)',
+        },
       },
-      required: ['schoolName', 'schoolType', 'schoolContactPerson', 'email', 'address', 'city', 'country', 'phoneNumber']
-    }
+      required: [
+        'schoolName',
+        'schoolType',
+        'schoolContactPerson',
+        'email',
+        'address',
+        'city',
+        'country',
+        'phoneNumber',
+      ],
+    },
   })
   @ApiResponse({
     status: 201,
@@ -140,7 +153,6 @@ export class SchoolController {
     @Body() createSchoolDto: CreateSchoolDto,
     @CurrentUser() superAdmin: User,
   ): Promise<School> {
-
     return this.schoolOnboardingService.onboardSchool(
       createSchoolDto,
       superAdmin,
@@ -174,6 +186,67 @@ export class SchoolController {
       this.logger.error('Error fetching all schools', error);
       throw error;
     }
+  }
+
+
+  @Get('/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get a school by ID',
+    description: 'This endpoint retrieves a school by its ID.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'School ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'School retrieved successfully',
+    type: School,
+  })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  async getSchoolById(@Param('id') schoolId: string): Promise<School> {
+    return this.schoolOnboardingService.getSchoolById(schoolId);
+  }
+
+  @Patch('/update/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @UseInterceptors(FileInterceptor('logo'))
+  @ApiOperation({
+    summary: 'Update a school',
+    description:
+      'This endpoint allows the super admin to update details of a school.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', type: String, description: 'School ID' })
+  @ApiBody({
+    description: 'School update information with optional logo upload',
+    schema: {
+      type: 'object',
+      properties: {
+        schoolName: { type: 'string', example: 'Updated School Name' },
+        schoolType: { type: 'string', example: 'Secondary' },
+        schoolContactPerson: { type: 'string', example: 'Jane Doe' },
+        email: { type: 'string', format: 'email' },
+        phoneNumber: { type: 'string', example: '+250788654321' },
+        address: { type: 'string' },
+        city: { type: 'string' },
+        country: { type: 'string' },
+        logo: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'School updated successfully',
+    type: School,
+  })
+  @ApiResponse({ status: 404, description: 'School not found' })
+  async updateSchool(
+    @Param('id') schoolId: string,
+    @Body() updateDto: Partial<CreateSchoolDto>,
+    @UploadedFile() logo?: Express.Multer.File,
+  ): Promise<School> {
+    return this.schoolOnboardingService.updateSchool(schoolId, updateDto, logo);
   }
 
   @Delete('/delete/:id')
