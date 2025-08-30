@@ -23,6 +23,7 @@ export class SchoolOnboardingService {
     private readonly redisService: RedisService,
   ) {}
 
+  // CREATE A NEW SCHOOL
   async onboardSchool(
     createSchoolDto: CreateSchoolDto,
     superAdmin: User,
@@ -115,6 +116,7 @@ export class SchoolOnboardingService {
     }
   }
 
+  // GET ALL SCHOOLS
   async getAllSchools(): Promise<School[]> {
     try {
       return await this.schoolModel
@@ -130,6 +132,74 @@ export class SchoolOnboardingService {
     }
   }
 
+  // GET SCHOOL BY ID
+  async getSchoolById(schoolId: string): Promise<School> {
+    try {
+      const school = await this.schoolModel
+        .findById(schoolId)
+        .populate('students')
+        .populate('transactions')
+        .select('-password')
+        // .populate('createdBy', 'firstName lastName email')
+        .exec();
+
+      if (!school || school.deletedAt) {
+        throw new NotFoundException(`School with ID ${schoolId} not found`);
+      }
+
+      return school;
+    } catch (error) {
+      this.logger.error(`Error fetching school with ID ${schoolId}`, error);
+      throw error;
+    }
+  }
+
+  // UPDATE SCHOOL DETAILS
+  async updateSchool(
+    schoolId: string,
+    updateDto: Partial<CreateSchoolDto>,
+    logoFile?: Express.Multer.File,
+  ): Promise<School> {
+    const session = await this.schoolModel.db.startSession();
+    session.startTransaction();
+
+    try {
+      const school = await this.schoolModel.findById(schoolId).session(session);
+      if (!school) {
+        throw new NotFoundException(`School with ID ${schoolId} not found`);
+      }
+
+      // handle logo update
+      if (logoFile) {
+        const logoUrl = await uploadToAzureStorage(logoFile);
+        updateDto = { ...updateDto, logoUrl };
+      }
+
+      Object.assign(school, updateDto);
+
+      await school.save({ session });
+      await session.commitTransaction();
+
+      this.logger.log(`School with ID ${schoolId} updated successfully`);
+
+      return await this.schoolModel
+        .findById(school._id)
+        // .populate('superAdmin students createdBy')
+        .select('-students')
+        .select('-transactions')
+        .select('-password')
+        .lean()
+        .exec();
+    } catch (error) {
+      await session.abortTransaction();
+      this.logger.error(`Error updating school with ID ${schoolId}`, error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  // DELETE A SCHOOL
   async deleteSchool(schoolId: string): Promise<void> {
     const session = await this.schoolModel.db.startSession();
     session.startTransaction();
