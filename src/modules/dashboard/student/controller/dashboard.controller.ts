@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Param,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
@@ -16,7 +17,8 @@ import { CurrentUser } from 'src/common/decorators';
 import { User } from 'src/modules/schemas';
 import { StudentDashboardService } from '../services/dashboard.service';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiBody } from '@nestjs/swagger';
+import { RewardsService } from 'src/modules/rewards/rewards.service';
 
 @Controller('student/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -26,6 +28,7 @@ export class StudentDashboardController {
   constructor(
     private readonly studentDashboardService: StudentDashboardService,
     private readonly logger: LoggerService,
+    private readonly rewardsService: RewardsService,
   ) {}
 
   @Get()
@@ -78,5 +81,45 @@ export class StudentDashboardController {
   })
   async getRecommendations(@CurrentUser() student: User) {
     return this.studentDashboardService.getRecommendations(student);
+  }
+
+  @Post('recommendations/:id/complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark educational content as completed and earn a star' })
+  @ApiParam({ name: 'id', description: 'Educational content ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['contentType', 'contentIndex'],
+      properties: {
+        contentType: { type: 'string', enum: ['video', 'book', 'game'] },
+        contentIndex: { type: 'number', description: 'Index of the content item in the array' }
+      }
+    }
+  })
+  async completeEducationalContent(
+    @CurrentUser() student: User,
+    @Param('id') educationalContentId: string,
+    @Body() payload: { contentType: 'video' | 'book' | 'game'; contentIndex: number }
+  ) {
+    // Check if the educational content exists and belongs to the student
+    const content = await this.studentDashboardService.getEducationalContent(educationalContentId);
+    
+    if (!content || content.user.toString() !== (student as any)._id.toString()) {
+      throw new NotFoundException('Educational content not found or does not belong to you');
+    }
+
+    // Award a star for completion
+    const star = await this.rewardsService.completeEducationalContent(
+      (student as any)._id,
+      educationalContentId,
+      payload.contentType,
+      payload.contentIndex
+    );
+
+    return {
+      message: `${payload.contentType} marked as completed successfully`,
+      star
+    };
   }
 }

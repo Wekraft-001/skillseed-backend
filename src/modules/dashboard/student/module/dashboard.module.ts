@@ -22,6 +22,7 @@ import { ContentModule } from 'src/modules/content/content.module';
 import { StudentCommunitiesController } from '../controllers/communities.controller';
 import { StudentCommunitiesService } from '../services/communities.service';
 import { CommunityModule } from 'src/modules/community/community.module';
+import { RewardsModule } from 'src/modules/rewards/rewards.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { CommunityModule } from 'src/modules/community/community.module';
     AiModule,
     ContentModule,
     CommunityModule,
+    RewardsModule,
   ],
   controllers: [
     StudentDashboardController, 

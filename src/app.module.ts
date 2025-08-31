@@ -33,6 +33,7 @@ import { MentorDashboardModule } from './modules/dashboard/mentors/module/dashbo
 import { StudentDashboardModule } from './modules/dashboard/student/module/dashboard.module';
 import { ContentModule } from './modules/content/content.module';
 import { CommunityModule } from './modules/community/community.module';
+import { RewardsModule } from './modules/rewards/rewards.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { CommunityModule } from './modules/community/community.module';
     PaymentModule,
     ContentModule,
     CommunityModule,
+    RewardsModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
