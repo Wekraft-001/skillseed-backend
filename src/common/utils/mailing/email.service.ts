@@ -163,4 +163,52 @@ export class EmailService {
       console.error('❌ Failed to send credential rejection email:', error);
     }
   }
+
+  async sendMentorSuspensionEmail(firstName: string, email: string) {
+    const mailOptions = {
+      from: process.env.MAIL_FROM,
+      to: email,
+      subject: 'Your Skillseed Mentor Account Has Been Suspended',
+      html: `
+      <p>Hi ${firstName},</p>
+      <p>We're writing to inform you that your Skillseed mentor account has been temporarily suspended.</p>
+      <p>This suspension may be due to a policy violation, credential verification issue, or administrative review.</p>
+      <p>If you believe this action was taken in error or would like to discuss the reinstatement of your account, please contact our support team at support@skillseed.com.</p>
+      <p>Thank you for your understanding.</p>
+      <p>Best regards,</p>
+      <p><strong>The Skillseed Team</strong></p>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Mentor suspension email sent:', info.response);
+    } catch (error) {
+      console.error('❌ Failed to send mentor suspension email:', error);
+    }
+  }
+
+  async sendMentorReactivationEmail(firstName: string, email: string) {
+    const mailOptions = {
+      from: process.env.MAIL_FROM,
+      to: email,
+      subject: 'Good News! Your Skillseed Mentor Account Has Been Reactivated',
+      html: `
+      <p>Hi ${firstName},</p>
+      <p>We're pleased to inform you that your Skillseed mentor account has been reactivated.</p>
+      <p>You can now log in to your account and resume all mentor activities on the platform.</p>
+      <p>Thank you for your patience during this process.</p>
+      <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+      <p>Best regards,</p>
+      <p><strong>The Skillseed Team</strong></p>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Mentor reactivation email sent:', info.response);
+    } catch (error) {
+      console.error('❌ Failed to send mentor reactivation email:', error);
+    }
+  }
 }

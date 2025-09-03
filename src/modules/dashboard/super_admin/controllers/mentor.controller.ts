@@ -28,7 +28,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('mentors')
-@ApiTags('Mentor')
+@ApiTags('Mentor Management')
 export class MentorController {
   constructor(
     private readonly mentorOnboardingService: MentorOnboardingService,
@@ -39,7 +39,6 @@ export class MentorController {
   @UseInterceptors(FileInterceptor('image'))
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
-  @ApiTags('Onboarding')
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Onboard a mentor with admin user',
@@ -84,7 +83,6 @@ export class MentorController {
   @Get('/all')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
-  @ApiTags('Mentor Management')
   @ApiResponse({
     status: 200,
     description: 'List of all mentors',
@@ -98,14 +96,14 @@ export class MentorController {
     isArray: false,
   })
   @ApiOperation({
-    summary: 'Get all schools',
+    summary: 'Get all mentors',
     description: 'This endpoint retrieves all mentors in the system.',
   })
-  async getAllSchools(): Promise<Mentor[]> {
+  async getAllMentors(): Promise<Mentor[]> {
     try {
       return await this.mentorOnboardingService.getAllMentors();
     } catch (error) {
-      this.logger.error('Error fetching all schools', error);
+      this.logger.error('Error fetching all mentors', error);
       throw error;
     }
   }
@@ -159,4 +157,88 @@ export class MentorController {
   //       throw error;
   //     }
   //   }
+
+  @Get('/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiResponse({
+    status: 200,
+    description: 'Mentor details',
+    type: Mentor,
+    isArray: false,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'ID of the mentor to retrieve',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Mentor not found',
+  })
+  @ApiOperation({
+    summary: 'Get mentor details',
+    description: 'This endpoint retrieves details of a specific mentor.',
+  })
+  async getMentorDetails(@Param('id') mentorId: string): Promise<Mentor> {
+    return this.mentorOnboardingService.getMentorById(mentorId);
+  }
+
+  @Post('/:id/suspend')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiResponse({
+    status: 200,
+    description: 'Mentor suspended successfully',
+    type: Mentor,
+    isArray: false,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'ID of the mentor to suspend',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Mentor not found',
+  })
+  @ApiOperation({
+    summary: 'Suspend a mentor',
+    description: 'This endpoint allows the super admin to suspend a mentor.',
+  })
+  async suspendMentor(
+    @CurrentUser() superAdmin: User,
+    @Param('id') mentorId: string,
+  ): Promise<Mentor> {
+    return this.mentorOnboardingService.suspendMentor(mentorId, superAdmin);
+  }
+
+  @Post('/:id/reactivate')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiResponse({
+    status: 200,
+    description: 'Mentor reactivated successfully',
+    type: Mentor,
+    isArray: false,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'ID of the mentor to reactivate',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Mentor not found',
+  })
+  @ApiOperation({
+    summary: 'Reactivate a mentor',
+    description: 'This endpoint allows the super admin to reactivate a suspended mentor.',
+  })
+  async reactivateMentor(
+    @CurrentUser() superAdmin: User,
+    @Param('id') mentorId: string,
+  ): Promise<Mentor> {
+    return this.mentorOnboardingService.reactivateMentor(mentorId, superAdmin);
+  }
 }
