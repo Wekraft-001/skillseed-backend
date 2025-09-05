@@ -36,4 +36,10 @@ export class PaymentController {
 
     return res.sendStatus(200);
   }
+
+  // For testing purposes only - should be removed in production
+  @Post('/test/mark-as-paid/:transactionRef')
+  async markAsPaid(@Param('transactionRef') transactionRef: string) {
+    return this.paymentService.manuallyMarkAsPaid(transactionRef);
+  }
 }
