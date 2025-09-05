@@ -37,7 +37,6 @@ import { JwtService } from '@nestjs/jwt';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { ParentDashboardService } from '../dashboard/parents/services/dashboard.service';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
-import { RegisterMentorDto } from 'src/common/interfaces';
 import { AuthTokenResponseDto } from 'src/common/interfaces';
 
 @Controller('auth')
@@ -247,67 +246,8 @@ export class AuthController {
     return this.authService.mentorSignin(dto);
   }
 
-  @Post('mentor/register')
-  @ApiTags('Mentor Authentication')
-  @ApiOperation({ summary: 'Mentor self-registration' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'photo', maxCount: 1 },
-      { name: 'nationalId', maxCount: 1 },
-    ]),
-  )
-  @ApiBody({
-    description: 'Mentor self-registration with optional photo and national ID',
-    schema: {
-      type: 'object',
-      properties: {
-        firstName: { type: 'string' },
-        lastName: { type: 'string' },
-        specialty: { type: 'string' },
-        email: { type: 'string', format: 'email' },
-        password: { type: 'string', minLength: 6 },
-        phoneNumber: { type: 'string' },
-        city: { type: 'string' },
-        country: { type: 'string' },
-        biography: { type: 'string' },
-        linkedin: { type: 'string' },
-        photo: { type: 'string', format: 'binary' },
-        nationalId: { type: 'string', format: 'binary' },
-      },
-      required: [
-        'firstName',
-        'lastName',
-        'specialty',
-        'email',
-        'password',
-        'phoneNumber',
-        'city',
-        'country',
-      ],
-    },
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Mentor registered successfully',
-    type: AuthTokenResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 409, description: 'Email already in use' })
-  async mentorRegister(
-    @UploadedFile() _unused?: any,
-    @Body() body?: RegisterMentorDto,
-    @Req() req?: Request,
-  ) {
-    const files = (req as any)?.files as {
-      photo?: any[];
-      nationalId?: any[];
-    };
-    return this.authService.mentorSelfRegister(body, {
-      photo: (files?.photo && files.photo[0]) || undefined,
-      nationalId: (files?.nationalId && files.nationalId[0]) || undefined,
-    });
-  }
+  // Mentor self-registration endpoint has been removed
+  // Mentors can only be registered by super admins through the admin dashboard
 
   @Post('parent/register')
   @ApiTags('Authentication')

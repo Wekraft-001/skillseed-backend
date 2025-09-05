@@ -1587,7 +1587,34 @@ export class AiService {
       throw new BadRequestException('No completed quiz found');
     }
 
-    const prompt = `Generate personalized educational content for a ${user.age}-year-old child name ${user.firstName}...`;
+    const prompt = `Generate personalized educational content for a ${user.age}-year-old child named ${user.firstName}.
+    
+Based on the quiz analysis: ${latestQuiz.analysis}, create a custom learning plan with:
+
+1. Videos: Suggest 3-5 educational YouTube videos. Include title and URL.
+2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, and educational theme.
+3. Games: Suggest 3-5 free educational games or activities. Include name, URL (if online), and skills they develop.
+
+Format your response as a JSON object with three keys:
+- "video": array of {title, url} objects
+- "books": array of {title, author, level, theme} objects - ONLY FREE AND OPEN SOURCE BOOKS
+- "games": array of {name, url, skill} objects
+
+For example:
+{
+  "video": [
+    {"title": "Introduction to Fractions", "url": "https://www.youtube.com/watch?v=example1"},
+    {"title": "The Water Cycle", "url": "https://www.youtube.com/watch?v=example2"}
+  ],
+  "books": [
+    {"title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "level": "Intermediate", "theme": "Imagination"},
+    {"title": "The Wonderful Wizard of Oz", "author": "L. Frank Baum", "level": "Intermediate", "theme": "Adventure"}
+  ],
+  "games": [
+    {"name": "ScratchJr", "url": "https://www.scratchjr.org/", "skill": "Coding"},
+    {"name": "Prodigy Math", "url": "https://www.prodigygame.com/", "skill": "Math"}
+  ]
+}`;
 
     const response = await this.openai.chat.completions.create({
       model: 'gpt-3.5-turbo',

@@ -5,6 +5,14 @@ import { ProjectShowcase } from './showcase.schema';
 
 export type BadgeDocument = Badge & Document;
 
+export enum BadgeTier {
+  BRONZE = 'bronze',
+  SILVER = 'silver',
+  GOLD = 'gold',
+  LEGENDARY = 'legendary',
+  SPECIAL = 'special'
+}
+
 @Schema({ timestamps: true })
 export class Badge {
   @Prop({ required: true, index: true })
@@ -13,8 +21,19 @@ export class Badge {
   @Prop({ required: true, index: true })
   description: string;
 
-  @Prop({index: true})
+  @Prop({ index: true })
   imageUrl: string;
+
+  @Prop({ 
+    type: String, 
+    enum: BadgeTier, 
+    default: BadgeTier.BRONZE, 
+    index: true 
+  })
+  tier: BadgeTier;
+
+  @Prop({ type: String, required: true, index: true })
+  icon: string;
 
   @Prop({
     type: [
@@ -36,6 +55,12 @@ export class Badge {
 
   @Prop({ type: Types.ObjectId, ref: 'ProjectShowcase', index: true })
   showcase: ProjectShowcase;
+
+  @Prop({ type: Types.ObjectId, ref: 'Challenge', index: true })
+  challenge: Types.ObjectId;
+
+  @Prop({ type: String, index: true })
+  badgeType: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   user: User;

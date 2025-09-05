@@ -41,7 +41,7 @@ export class MentorOnboardingService {
         imageUrl = await uploadToAzureStorage(imageFile);
       }
 
-      // Create mentor document
+      // Create mentor document with all available fields
       const newMentor = new this.mentorModel({
         firstName: createMentorDto.firstName,
         lastName: createMentorDto.lastName,
@@ -51,6 +51,12 @@ export class MentorOnboardingService {
         city: createMentorDto.city,
         country: createMentorDto.country,
         image: imageUrl,
+        biography: createMentorDto.biography,
+        linkedin: createMentorDto.linkedin,
+        areasOfExpertise: createMentorDto.areasOfExpertise,
+        languages: createMentorDto.languages,
+        yearsOfExperience: createMentorDto.yearsOfExperience,
+        education: createMentorDto.education,
         role: UserRole.MENTOR,
         password: hashedPassword,
         createdBy: superAdmin._id,
@@ -94,7 +100,88 @@ export class MentorOnboardingService {
         .sort({ createdAt: -1 })
         .exec();
     } catch (error) {
-      this.logger.error('Error fetching schools', error);
+      this.logger.error('Error fetching mentors', error);
+      throw error;
+    }
+  }
+
+  async getMentorById(mentorId: string): Promise<Mentor> {
+    try {
+      const mentor = await this.mentorModel
+        .findOne({ _id: mentorId, role: UserRole.MENTOR, deletedAt: null })
+        .populate('createdBy', 'firstName lastName email')
+        .exec();
+
+      if (!mentor) {
+        throw new Error('Mentor not found');
+      }
+
+      return mentor;
+    } catch (error) {
+      this.logger.error(`Error fetching mentor with ID: ${mentorId}`, error);
+      throw error;
+    }
+  }
+
+  async suspendMentor(mentorId: string, superAdmin: User): Promise<Mentor> {
+    try {
+      const mentor = await this.mentorModel.findOne({
+        _id: mentorId,
+        role: UserRole.MENTOR,
+        deletedAt: null,
+      });
+
+      if (!mentor) {
+        throw new Error('Mentor not found');
+      }
+
+      mentor.deletedAt = new Date();
+      await mentor.save();
+
+      this.logger.log(
+        `Mentor suspended: ${mentor.firstName} ${mentor.lastName} by ${superAdmin.email}`,
+      );
+
+      // Optionally send an email to the mentor about account suspension
+      await this.emailService.sendMentorSuspensionEmail(
+        mentor.firstName,
+        mentor.email,
+      );
+
+      return mentor;
+    } catch (error) {
+      this.logger.error(`Error suspending mentor with ID: ${mentorId}`, error);
+      throw error;
+    }
+  }
+
+  async reactivateMentor(mentorId: string, superAdmin: User): Promise<Mentor> {
+    try {
+      const mentor = await this.mentorModel.findOne({
+        _id: mentorId,
+        role: UserRole.MENTOR,
+      });
+
+      if (!mentor) {
+        throw new Error('Mentor not found');
+      }
+
+      mentor.deletedAt = null;
+      await mentor.save();
+
+      this.logger.log(
+        `Mentor reactivated: ${mentor.firstName} ${mentor.lastName} by ${superAdmin.email}`,
+      );
+
+      // Optionally send an email to the mentor about account reactivation
+      await this.emailService.sendMentorReactivationEmail(
+        mentor.firstName,
+        mentor.email,
+      );
+
+      return mentor;
+    } catch (error) {
+      this.logger.error(`Error reactivating mentor with ID: ${mentorId}`, error);
       throw error;
     }
   }

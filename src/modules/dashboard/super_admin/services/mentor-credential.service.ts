@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { MentorCredential, MentorCredentialDocument } from 'src/modules/schemas/mentor-credential.schema';
-import { User } from 'src/modules/schemas';
+import { User, Mentor } from 'src/modules/schemas';
 import { VerifyCredentialDto } from 'src/common/interfaces/verify-credential.dto';
 import { EmailService } from 'src/common/utils/mailing/email.service';
+import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
 
 @Injectable()
 export class MentorCredentialService {
@@ -15,6 +16,9 @@ export class MentorCredentialService {
     
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
+    
+    @InjectModel(Mentor.name)
+    private readonly mentorModel: Model<Mentor>,
     
     private readonly logger: LoggerService,
     private readonly emailService: EmailService,
@@ -132,6 +136,66 @@ export class MentorCredentialService {
       return credential;
     } catch (error) {
       this.logger.error(`Error fetching credential: ${credentialId}`, error);
+      throw error;
+    }
+  }
+  
+  async uploadCredential(
+    mentorId: string,
+    credentialType: 'government_id' | 'professional_credentials',
+    file: Express.Multer.File,
+    description?: string,
+  ) {
+    try {
+      // Check if mentor exists
+      const mentor = await this.mentorModel.findById(mentorId);
+      if (!mentor) {
+        throw new NotFoundException(`Mentor with ID ${mentorId} not found`);
+      }
+
+      // Upload file to Azure storage
+      const fileUrl = await uploadToAzureStorage(file);
+
+      // Create new credential document
+      const newCredential = new this.credentialModel({
+        mentor: mentorId,
+        credentialType,
+        fileUrl,
+        fileName: file.originalname,
+        description,
+        status: 'pending',
+      });
+
+      await newCredential.save();
+
+      this.logger.log(
+        `Credential uploaded for mentor ${mentorId}, type: ${credentialType}`,
+      );
+
+      return newCredential;
+    } catch (error) {
+      this.logger.error(
+        `Error uploading credential for mentor ${mentorId}`,
+        error,
+      );
+      throw error;
+    }
+  }
+  
+  async getCredentialsForMentor(mentorId: string) {
+    try {
+      const credentials = await this.credentialModel
+        .find({ mentor: mentorId })
+        .populate('verifiedBy', 'firstName lastName email')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      return credentials;
+    } catch (error) {
+      this.logger.error(
+        `Error fetching credentials for mentor ${mentorId}`,
+        error,
+      );
       throw error;
     }
   }

@@ -100,4 +100,8 @@ export class StudentDashboardService {
 
     return content;
   }
+
+  async getEducationalContent(contentId: string): Promise<EducationalContent | null> {
+    return this.eduContentModel.findById(contentId).exec();
+  }
 }
