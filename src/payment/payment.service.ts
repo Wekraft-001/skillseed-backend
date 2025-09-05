@@ -13,6 +13,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import {
   FlutterwavePaymentInitiationResponse,
   SubscriptionStatus,
+  PaymentStatus,
 } from 'src/common/interfaces';
 import * as crypto from 'crypto';
 import { v4 as uuid } from 'uuid';
@@ -222,11 +223,17 @@ export class PaymentService {
         if (subscription) {
           const { startDate, endDate } = this.calculateExpiration();
 
+          // Update all required fields
           subscription.status = SubscriptionStatus.ACTIVE;
+          subscription.paymentStatus = PaymentStatus.COMPLETED;
+          subscription.isActive = true;
           subscription.startDate = startDate;
           subscription.endDate = endDate;
+          subscription.flutterwaveTransactionId = data.id; // Store the transaction ID
 
+          this.logger.log(`🔄 Updating subscription ${subscription._id} with payment data`);
           await subscription.save();
+          this.logger.log(`✅ Subscription updated successfully`);
         } else {
           this.logger.warn(`⚠️ No subscription found for tx_ref ${txRef}`);
         }
@@ -239,7 +246,7 @@ export class PaymentService {
   }
 
   async findSubscriptionByTxRef(txRef: string) {
-    return await this.subscriptionModel.findOne({ txRef });
+    return await this.subscriptionModel.findOne({ transactionRef: txRef });
   }
 
   calculateExpiration(): { startDate: Date; endDate: Date } {
@@ -279,6 +286,35 @@ export class PaymentService {
         error.response?.data || error.message,
       );
       throw new BadRequestException('Failed to get transaction details');
+    }
+  }
+
+  // FOR TESTING ONLY: Manually mark a subscription as paid
+  async manuallyMarkAsPaid(transactionRef: string) {
+    try {
+      const subscription = await this.subscriptionModel.findOne({ transactionRef });
+      
+      if (!subscription) {
+        throw new NotFoundException(`No subscription found with transactionRef: ${transactionRef}`);
+      }
+
+      const { startDate, endDate } = this.calculateExpiration();
+      
+      // Update all required fields
+      subscription.status = SubscriptionStatus.ACTIVE;
+      subscription.paymentStatus = PaymentStatus.COMPLETED;
+      subscription.isActive = true;
+      subscription.startDate = startDate;
+      subscription.endDate = endDate;
+      subscription.flutterwaveTransactionId = `manual-${Date.now()}`; // Create a manual ID
+
+      await subscription.save();
+      
+      this.logger.log(`Manually marked subscription ${subscription._id} as paid`);
+      return subscription;
+    } catch (error) {
+      this.logger.error(`Error manually marking subscription as paid: ${error.message}`);
+      throw error;
     }
   }
 }
