@@ -99,7 +99,7 @@ export class ParentDashboardController {
     return this.parentDashboardService.registerFinalStudent(temp as any, user);
   }
 
-  @Get('student')
+  @Get('students')
   @HttpCode(HttpStatus.OK)
   async getStudent(@Request() req) {
     const user = req.user;

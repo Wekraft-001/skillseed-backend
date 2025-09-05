@@ -62,7 +62,8 @@ export class PaymentService {
         },
         redirect_url:
           customerData.redirect_url ||
-          'https://parents.wekraft.co/payment-verify',
+          `https://parents.wekraft.co/payment-success/${customerData.childTempId}`,
+        // `http://localhost:5173/payment-success/${customerData.childTempId}`,
       };
 
       this.logger.log(`Creating payment at: ${url}`);

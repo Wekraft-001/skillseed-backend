@@ -31,7 +31,7 @@ import { Transaction } from 'src/modules/schemas/transaction.schema';
 @Injectable()
 export class ParentDashboardService {
   aiService: any;
-  // private tempStudentsStorage: Record<string, any> = {};
+
   constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
@@ -87,7 +87,6 @@ export class ParentDashboardService {
 
     const childTempId = `student-${uuidv4()}`;
     const imageUrl = image ? await uploadToAzureStorage(image) : '';
-
     const hashedPassword = await bcrypt.hash(createStudentDto.password, 10);
 
     const tempStudentData = new this.tempStudentModel({
@@ -98,7 +97,6 @@ export class ParentDashboardService {
       paymentUrl: `/parent/dashboard/complete-student-registration/${childTempId}`,
     });
 
-    // this.tempStudentsStorage[childTempId] = tempStudentData;
     await tempStudentData.save();
 
     return {
@@ -316,7 +314,7 @@ export class ParentDashboardService {
       age: tempStudentData.age,
       password: tempStudentData.password,
       role: UserRole.STUDENT,
-      imageUrl: tempStudentData.imageUrl,
+      image: tempStudentData.imageUrl,
       parent: user._id,
       subscription: subscription._id,
       createdBy: subscription.user,
@@ -377,7 +375,9 @@ export class ParentDashboardService {
       query.createdBy = user._id;
     }
 
-    return this.userModel.find(query).populate('createdBy').lean();
+    return this.userModel
+      .find(query, { password: 0, createdBy: 0, __v: 0 })
+      .lean();
   }
 
   /**

@@ -49,12 +49,12 @@ export class SubscriptionService {
 
       const customerData = {
         amount: subscriptionData.amount,
-        currency: subscriptionData.currency || 'RWF',
-        redirect_url: 'http://localhost:3000/api/subscriptions/success',
+        currency: subscriptionData.currency,
         tx_ref: transactionRef,
         name: `${user.firstName} ${user.lastName}`,
         phonenumber: `+250${user.phoneNumber}`,
         email: user.email,
+        childTempId: subscriptionData.childTempId,
       };
 
       this.logger.log(
@@ -97,7 +97,6 @@ export class SubscriptionService {
         subscription,
         authorizationUrl: hostedLink,
         reference: transactionRef,
-        // childTempId,
       };
     } catch (error) {
       this.logger.error('Error creating subscription', error);
@@ -127,6 +126,7 @@ export class SubscriptionService {
         phonenumber: `+250${user.phoneNumber}`,
         email: user.email,
         payment_options: 'mobilemoneyrwanda',
+        childTempId: subscriptionData.childTempId,
       };
 
       const hostedPayment =
@@ -150,7 +150,7 @@ export class SubscriptionService {
         child: null,
         childTempId: subscriptionData.childTempId,
         maxChildren: 30,
-        payment_options: subscriptionData.payment_options
+        payment_options: subscriptionData.payment_options,
       });
 
       await subscription.save();
@@ -358,8 +358,4 @@ export class SubscriptionService {
       .populate('user')
       .populate('child');
   }
-
 }
-
-
-
