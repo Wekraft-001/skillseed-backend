@@ -172,38 +172,6 @@ export class PaymentService {
     }
   }
 
-  async verifyPayment(transactionId: string): Promise<any> {
-    try {
-      const url = `${this.flutterwaveUrl}/transactions/${transactionId}/verify`;
-
-      this.logger.log(`Verifying payment at: ${url}`);
-
-      const response: AxiosResponse = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${this.secretKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.data.status !== 'success') {
-        this.logger.error('Payment verification failed', response.data);
-        throw new BadRequestException('Payment verification failed');
-      }
-
-      this.logger.log(`Payment verified successfully: ${transactionId}`);
-
-      return (
-        response.data.status === 'success' &&
-        response.data.data.status === 'successful'
-      );
-    } catch (error) {
-      this.logger.error(
-        'Error verifying payment',
-        error.response?.data || error.message,
-      );
-      throw new BadRequestException('Payment verification failed');
-    }
-  }
 
   async processWebhook(event: any) {
     this.logger.debug(
@@ -315,6 +283,54 @@ export class PaymentService {
     } catch (error) {
       this.logger.error(`Error manually marking subscription as paid: ${error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * Verify a Flutterwave payment transaction
+   * @param transactionId The Flutterwave transaction ID to verify
+   * @returns The transaction details if verified successfully
+   */
+  async verifyPayment(transactionId: string) {
+    try {
+      const url = `${this.flutterwaveUrl}/transactions/${transactionId}/verify`;
+      
+      this.logger.log(`Verifying payment at: ${url}`);
+      
+      const response: AxiosResponse = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Check if the transaction was successful
+      if (
+        response.data.status === 'success' && 
+        response.data.data && 
+        response.data.data.status === 'successful'
+      ) {
+        this.logger.log(
+          `Payment verified successfully: ${transactionId}, Amount: ${response.data.data.amount}, Currency: ${response.data.data.currency}`,
+        );
+        return response.data.data;
+      } else {
+        this.logger.warn(
+          `Payment verification failed for transaction ${transactionId}: ${JSON.stringify(response.data)}`,
+        );
+        return null;
+      }
+    } catch (error) {
+      this.logger.error(
+        'Error verifying payment:',
+        JSON.stringify({
+          transactionId,
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        }),
+      );
+      throw new BadRequestException('Failed to verify payment');
     }
   }
 }

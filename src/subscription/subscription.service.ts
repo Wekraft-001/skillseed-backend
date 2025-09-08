@@ -359,4 +359,11 @@ export class SubscriptionService {
       .populate('user')
       .populate('child');
   }
+
+  // Added for payment verification flow
+  async findSubscriptionByChildTempId(childTempId: string): Promise<SubscriptionDocument | null> {
+    return this.subscriptionModel.findOne({
+      childTempId: childTempId,
+    });
+  }
 }
