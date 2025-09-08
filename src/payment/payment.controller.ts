@@ -12,12 +12,14 @@ import { PaymentService } from './payment.service';
 import { SubscriptionService } from 'src/subscription/subscription.service';
 import { CardPaymentRequest, SubscriptionStatus, PaymentStatus } from 'src/common/interfaces';
 import { Request, Response } from 'express';
+import { LoggerService } from 'src/common/logger/logger.service';
 
 @Controller('payments')
 export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly logger: LoggerService,
   ) {}
   
   @Post('/flutterwave/webhook')
@@ -61,6 +63,17 @@ export class PaymentController {
           return { 
             success: false, 
             message: 'Subscription not found'
+          };
+        }
+        
+        // Check if this transaction was already processed
+        if (subscription.flutterwaveTransactionId === transactionId && 
+            subscription.status === SubscriptionStatus.ACTIVE) {
+          this.logger.log(`Transaction ${transactionId} was already processed for subscription ${subscription._id}`);
+          return { 
+            success: true, 
+            message: 'Payment already verified and subscription activated',
+            subscription
           };
         }
         

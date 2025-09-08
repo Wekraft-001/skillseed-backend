@@ -350,17 +350,31 @@ export class ParentDashboardService {
     await student.save();
     this.logger.log(`Student registered successfully: >>> ${student}`);
 
-    // Create a transaction record for the registration
-    const transaction = new this.transactionModel({
-      amount: subscription.amount,
-      paymentMethod: PaymentMethod.MOBILE_MONEY, // Default to mobile money since it's most common
+    // Check if a transaction already exists for this subscription
+    const existingTransaction = await this.transactionModel.findOne({
       transactionType: transactionType.STUDENT_REGISTRATION,
-      transactionDate: new Date(),
       parent: user._id,
       student: student._id,
-      notes: `Student registration for ${student.firstName} ${student.lastName}`,
     });
-    await transaction.save();
+
+    // Only create a transaction if one doesn't already exist
+    if (!existingTransaction) {
+      // Create a transaction record for the registration
+      const transaction = new this.transactionModel({
+        amount: subscription.amount,
+        paymentMethod: PaymentMethod.MOBILE_MONEY, // Default to mobile money since it's most common
+        transactionType: transactionType.STUDENT_REGISTRATION,
+        transactionDate: new Date(),
+        parent: user._id,
+        student: student._id,
+        notes: `Student registration for ${student.firstName} ${student.lastName}`,
+        transactionRef: subscription.flutterwaveTransactionId || subscription.transactionRef,
+      });
+      await transaction.save();
+      this.logger.log(`Created transaction record: ${transaction._id}`);
+    } else {
+      this.logger.log(`Transaction already exists for this registration: ${existingTransaction._id}`);
+    }
 
     const populatedStudent = await this.userModel
       .findById(student._id)
