@@ -55,6 +55,7 @@ export class SubscriptionService {
         phonenumber: `+250${user.phoneNumber}`,
         email: user.email,
         childTempId: subscriptionData.childTempId,
+        payment_options: subscriptionData.payment_options,
       };
 
       this.logger.log(
