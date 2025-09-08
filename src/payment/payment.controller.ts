@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { SubscriptionService } from 'src/subscription/subscription.service';
-import { CardPaymentRequest } from 'src/common/interfaces';
+import { CardPaymentRequest, SubscriptionStatus, PaymentStatus } from 'src/common/interfaces';
 import { Request, Response } from 'express';
 
 @Controller('payments')
@@ -41,5 +41,61 @@ export class PaymentController {
   @Post('/test/mark-as-paid/:transactionRef')
   async markAsPaid(@Param('transactionRef') transactionRef: string) {
     return this.paymentService.manuallyMarkAsPaid(transactionRef);
+  }
+
+  // Verify transaction by ID
+  @Get('/verify-transaction/:transactionId/:childTempId')
+  async verifyTransaction(
+    @Param('transactionId') transactionId: string,
+    @Param('childTempId') childTempId: string,
+  ) {
+    try {
+      // First verify with Flutterwave
+      const verified = await this.paymentService.verifyPayment(transactionId);
+      
+      if (verified) {
+        // Find subscription by childTempId
+        const subscription = await this.subscriptionService.findSubscriptionByChildTempId(childTempId);
+        
+        if (!subscription) {
+          return { 
+            success: false, 
+            message: 'Subscription not found'
+          };
+        }
+        
+        // Update subscription with transaction ID
+        subscription.flutterwaveTransactionId = transactionId;
+        subscription.status = SubscriptionStatus.ACTIVE;
+        subscription.isActive = true;
+        subscription.paymentStatus = PaymentStatus.COMPLETED;
+        
+        // Calculate start and end dates
+        const { startDate, endDate } = this.paymentService.calculateExpiration();
+        
+        subscription.startDate = startDate;
+        subscription.endDate = endDate;
+        
+        await subscription.save();
+        
+        return { 
+          success: true, 
+          message: 'Payment verified and subscription activated',
+          subscription
+        };
+      }
+      
+      return { 
+        success: false, 
+        message: 'Payment verification failed'
+      };
+    } catch (error) {
+      console.error(`Error verifying transaction: ${error.message}`, error.stack);
+      return { 
+        success: false, 
+        message: 'Error verifying payment',
+        error: error.message
+      };
+    }
   }
 }
