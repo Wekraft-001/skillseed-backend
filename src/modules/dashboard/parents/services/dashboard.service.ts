@@ -251,7 +251,7 @@ export class ParentDashboardService {
   //   return populatedStudent;
   // }
 
-  async registerFinalStudent(
+  async registerFinalStudent1(
     tempStudentData: TempStudentDataDto,
     user: User,
     // subscription: SubscriptionDocument,
@@ -362,18 +362,21 @@ export class ParentDashboardService {
       // Create a transaction record for the registration
       const transaction = new this.transactionModel({
         amount: subscription.amount,
-        paymentMethod: PaymentMethod.MOBILE_MONEY, // Default to mobile money since it's most common
+        // paymentMethod: PaymentMethod.MOBILE_MONEY, // Default to mobile money since it's most common
         transactionType: transactionType.STUDENT_REGISTRATION,
         transactionDate: new Date(),
         parent: user._id,
         student: student._id,
         notes: `Student registration for ${student.firstName} ${student.lastName}`,
-        transactionRef: subscription.flutterwaveTransactionId || subscription.transactionRef,
+        transactionRef:
+          subscription.flutterwaveTransactionId || subscription.transactionRef,
       });
       await transaction.save();
       this.logger.log(`Created transaction record: ${transaction._id}`);
     } else {
-      this.logger.log(`Transaction already exists for this registration: ${existingTransaction._id}`);
+      this.logger.log(
+        `Transaction already exists for this registration: ${existingTransaction._id}`,
+      );
     }
 
     const populatedStudent = await this.userModel
@@ -381,6 +384,200 @@ export class ParentDashboardService {
       .populate('subscription')
       .lean();
     return populatedStudent;
+  }
+
+  async registerFinalStudent(tempStudentData: TempStudentDataDto, user: User) {
+    const session = await this.userModel.db.startSession();
+    session.startTransaction();
+
+    try {
+      this.logger.log(
+        `Looking for subscription with childTempId: ${tempStudentData.childTempId} and user: ${user._id}`,
+      );
+
+      // Check if student already exists for this temp ID
+      // First, check if subscription already has a child linked
+      const existingSubscriptionWithChild = await this.subscriptionModel
+        .findOne({
+          user: user._id,
+          childTempId: tempStudentData.childTempId,
+          child: { $ne: null },
+        })
+        .populate('child');
+
+      if (
+        existingSubscriptionWithChild &&
+        existingSubscriptionWithChild.child
+      ) {
+        this.logger.log(
+          `Student already exists for childTempId: ${tempStudentData.childTempId}`,
+        );
+        await session.abortTransaction();
+        session.endSession();
+
+        // Return the existing student
+        const existingStudent = await this.userModel
+          .findById(existingSubscriptionWithChild.child)
+          .populate('subscription')
+          .lean();
+        return existingStudent;
+      }
+
+      const subscription = await this.subscriptionModel
+        .findOne({
+          user: user._id,
+          childTempId: tempStudentData.childTempId,
+          child: null,
+        })
+        .exec();
+
+      this.logger.log(
+        `Found subscription: ${JSON.stringify({
+          id: subscription?._id,
+          status: subscription?.status,
+          paymentStatus: subscription?.paymentStatus,
+          isActive: subscription?.isActive,
+          child: subscription?.child,
+        })}`,
+      );
+
+      // Check subscription status
+      if (!subscription) {
+        throw new BadRequestException(
+          'No subscription found for this student registration',
+        );
+      }
+
+      // Check if subscription is already linked to another child
+      if (subscription.child) {
+        this.logger.log(
+          `Subscription already linked to child: ${subscription.child}`,
+        );
+        await session.abortTransaction();
+        session.endSession();
+
+        // Return the existing student
+        const existingChild = await this.userModel
+          .findById(subscription.child)
+          .populate('subscription')
+          .lean();
+        return existingChild;
+      }
+
+      if (subscription.paymentStatus !== PaymentStatus.COMPLETED) {
+        throw new BadRequestException(
+          'Payment not completed. Please complete payment before finalizing registration',
+        );
+      }
+
+      if (!subscription.isActive) {
+        throw new BadRequestException(
+          'Subscription is not active. Please contact support if you have completed payment',
+        );
+      }
+
+      if (subscription.endDate < new Date()) {
+        this.logger.error(
+          `Subscription ${subscription._id} has already expired. Cannot register student.`,
+        );
+        throw new BadRequestException('Subscription has expired');
+      }
+
+      // Create permanent student record
+      const student = new this.userModel({
+        firstName: tempStudentData.firstName,
+        lastName: tempStudentData.lastName,
+        grade: tempStudentData.grade,
+        age: tempStudentData.age,
+        password: tempStudentData.password,
+        role: UserRole.STUDENT,
+        image: tempStudentData.imageUrl,
+        parent: user._id,
+        subscription: subscription._id,
+        createdBy: subscription.user,
+      });
+
+      // Save student first
+      await student.save({ session });
+
+      // Link student to subscription
+      subscription.child = new Types.ObjectId(student._id.toString());
+      await subscription.save({ session });
+
+      this.logger.log(
+        `Child ${student._id} linked to subscription ${subscription._id}`,
+      );
+
+      // Generate initial career quiz for student
+      try {
+        const ageRange = this.calculateAgeRange(student.age);
+        const quiz = await this.aiService.generateCareerQuizForUserId(
+          student._id,
+          ageRange,
+        );
+        student.initialQuizId = quiz._id;
+        await student.save({ session });
+        this.logger.log(
+          `Generated initial career quiz ${quiz._id} for student ${student._id}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to generate initial quiz for student ${student._id}: ${error.message}`,
+        );
+        // Don't fail registration if quiz generation fails
+      }
+
+      // Check if a transaction already exists for this subscription
+      const existingTransaction = await this.transactionModel.findOne({
+        transactionType: transactionType.STUDENT_REGISTRATION,
+        parent: user._id,
+        // Check by subscription reference or temp ID to prevent duplicates
+        $or: [
+          { student: student._id },
+          { transactionRef: subscription.transactionRef },
+        ],
+      });
+
+      // Only create a transaction if one doesn't already exist
+      if (!existingTransaction) {
+        // Create a transaction record for the registration
+        const transaction = new this.transactionModel({
+          amount: subscription.amount,
+          paymentMethod: subscription.payment_options,
+          transactionType: transactionType.STUDENT_REGISTRATION,
+          transactionDate: new Date(),
+          parent: user._id,
+          student: student._id,
+          notes: `Student registration for ${student.firstName} ${student.lastName}`,
+          transactionRef:
+            subscription.flutterwaveTransactionId ||
+            subscription.transactionRef,
+        });
+        await transaction.save({ session });
+        this.logger.log(`Created transaction record: ${transaction._id}`);
+      } else {
+        this.logger.log(
+          `Transaction already exists for this registration: ${existingTransaction._id}`,
+        );
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+
+      this.logger.log(`Student registered successfully: ${student._id}`);
+
+      const populatedStudent = await this.userModel
+        .findById(student._id)
+        .populate('subscription')
+        .lean();
+
+      return populatedStudent;
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      this.logger.error(`Error in registerFinalStudent: ${error.message}`);
+      throw error;
+    }
   }
 
   async getStudentForUser(user: User) {
@@ -392,6 +589,34 @@ export class ParentDashboardService {
     return this.userModel
       .find(query, { password: 0, createdBy: 0, __v: 0 })
       .lean();
+  }
+
+  async getUserSubscriptions(user: User) {
+    try {
+      this.logger.log(`Fetching subscriptions for user: ${user._id}`);
+
+      // Find subscriptions created by this user and populate child details
+      const subscriptions = await this.subscriptionModel
+        .find({ user: user._id })
+        .populate({
+          path: 'child', // reference to student
+          model: this.userModel,
+          select: 'firstName lastName age grade image role', // only needed fields
+        })
+        .lean();
+
+      return {
+        success: true,
+        message: 'Subscriptions retrieved successfully',
+        subscriptions,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error fetching subscriptions for user: ${user._id}`,
+        error,
+      );
+      throw new BadRequestException('Could not fetch subscriptions');
+    }
   }
 
   /**

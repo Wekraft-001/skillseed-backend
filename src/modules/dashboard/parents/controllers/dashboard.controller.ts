@@ -111,4 +111,22 @@ export class ParentDashboardController {
       throw error;
     }
   }
+
+  @ApiOperation({
+    summary: 'Get all subscriptions created by the parent (with child details)',
+  })
+  @Get('subscriptions')
+  @HttpCode(HttpStatus.OK)
+  async getSubscriptions(@CurrentUser() user: User) {
+    try {
+      this.logger.log(`Fetching subscriptions for parent: ${user.email}`);
+      return await this.parentDashboardService.getUserSubscriptions(user);
+    } catch (error) {
+      this.logger.error(
+        `Error fetching subscriptions for parent: ${user._id}`,
+        error,
+      );
+      throw error;
+    }
+  }
 }
