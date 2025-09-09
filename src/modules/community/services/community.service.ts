@@ -41,12 +41,6 @@ export class CommunityService {
         throw new ForbiddenException('Only super admins can create communities');
       }
 
-      // Validate challenge category exists
-      const challengeCategory = await this.challengeCategoryModel.findById(createCommunityDto.challengeCategory);
-      if (!challengeCategory) {
-        throw new BadRequestException(`Challenge category with ID ${createCommunityDto.challengeCategory} not found`);
-      }
-
       const newCommunity = new this.communityModel({
         ...createCommunityDto,
         members: [],
@@ -69,10 +63,6 @@ export class CommunityService {
         query.category = filterDto.category;
       }
       
-      if (filterDto.challengeCategory) {
-        query.challengeCategory = new Types.ObjectId(filterDto.challengeCategory);
-      }
-      
       if (filterDto.ageGroup) {
         query.ageGroup = filterDto.ageGroup;
       }
@@ -85,7 +75,7 @@ export class CommunityService {
       }
 
       const communities = await this.communityModel.find(query)
-        .select('name description category imageUrl members')
+        .select('name description category members')
         .sort({ name: 1 })
         .exec();
 
