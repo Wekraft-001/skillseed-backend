@@ -63,8 +63,8 @@ export class PaymentService {
         },
         redirect_url:
           customerData.redirect_url ||
-          // `https://parents.wekraft.co/payment-success/${customerData.childTempId}`,
-        `http://localhost:5173/payment-success/${customerData.childTempId}`,
+          `https://parents.wekraft.co/payment-success/${customerData.childTempId}`,
+        // `http://localhost:5173/payment-success/${customerData.childTempId}`,
       };
 
       this.logger.log(`Creating payment at: ${url}`);
@@ -172,7 +172,6 @@ export class PaymentService {
     }
   }
 
-
   async processWebhook(event: any) {
     this.logger.debug(
       `📥 Received Flutterwave Webhook: ${JSON.stringify(event)}`,
@@ -199,7 +198,9 @@ export class PaymentService {
           subscription.endDate = endDate;
           subscription.flutterwaveTransactionId = data.id; // Store the transaction ID
 
-          this.logger.log(`🔄 Updating subscription ${subscription._id} with payment data`);
+          this.logger.log(
+            `🔄 Updating subscription ${subscription._id} with payment data`,
+          );
           await subscription.save();
           this.logger.log(`✅ Subscription updated successfully`);
         } else {
@@ -260,14 +261,18 @@ export class PaymentService {
   // FOR TESTING ONLY: Manually mark a subscription as paid
   async manuallyMarkAsPaid(transactionRef: string) {
     try {
-      const subscription = await this.subscriptionModel.findOne({ transactionRef });
-      
+      const subscription = await this.subscriptionModel.findOne({
+        transactionRef,
+      });
+
       if (!subscription) {
-        throw new NotFoundException(`No subscription found with transactionRef: ${transactionRef}`);
+        throw new NotFoundException(
+          `No subscription found with transactionRef: ${transactionRef}`,
+        );
       }
 
       const { startDate, endDate } = this.calculateExpiration();
-      
+
       // Update all required fields
       subscription.status = SubscriptionStatus.ACTIVE;
       subscription.paymentStatus = PaymentStatus.COMPLETED;
@@ -277,11 +282,15 @@ export class PaymentService {
       subscription.flutterwaveTransactionId = `manual-${Date.now()}`; // Create a manual ID
 
       await subscription.save();
-      
-      this.logger.log(`Manually marked subscription ${subscription._id} as paid`);
+
+      this.logger.log(
+        `Manually marked subscription ${subscription._id} as paid`,
+      );
       return subscription;
     } catch (error) {
-      this.logger.error(`Error manually marking subscription as paid: ${error.message}`);
+      this.logger.error(
+        `Error manually marking subscription as paid: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -294,9 +303,9 @@ export class PaymentService {
   async verifyPayment(transactionId: string) {
     try {
       const url = `${this.flutterwaveUrl}/transactions/${transactionId}/verify`;
-      
+
       this.logger.log(`Verifying payment at: ${url}`);
-      
+
       const response: AxiosResponse = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${this.secretKey}`,
@@ -306,8 +315,8 @@ export class PaymentService {
 
       // Check if the transaction was successful
       if (
-        response.data.status === 'success' && 
-        response.data.data && 
+        response.data.status === 'success' &&
+        response.data.data &&
         response.data.data.status === 'successful'
       ) {
         this.logger.log(
