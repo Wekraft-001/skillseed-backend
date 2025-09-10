@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsMongoId, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsEnum, IsMongoId, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { AgeGroup, CommunityCategory } from '../../schemas/community.schema';
 import { Types } from 'mongoose';
 
@@ -19,23 +19,8 @@ export class CreateCommunityDto {
   @IsOptional()
   category?: CommunityCategory;
 
-  @ApiProperty({ description: 'Challenge category ID that this community belongs to', example: '507f1f77bcf86cd799439011' })
-  @IsMongoId()
-  @IsNotEmpty()
-  challengeCategory: string | Types.ObjectId;
-
   @ApiProperty({ enum: AgeGroup, description: 'Age group for this community', example: AgeGroup.AGE_9_TO_12 })
   @IsEnum(AgeGroup)
   @IsNotEmpty()
   ageGroup: AgeGroup;
-
-  @ApiProperty({ description: 'Community profile image URL', example: 'https://example.com/tech-club.jpg', required: false })
-  @IsOptional()
-  @IsUrl()
-  imageUrl?: string;
-
-  @ApiProperty({ description: 'Community banner image URL', example: 'https://example.com/tech-banner.jpg', required: false })
-  @IsOptional()
-  @IsUrl()
-  bannerUrl?: string;
 }

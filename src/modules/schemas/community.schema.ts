@@ -40,10 +40,10 @@ export class Community {
   @Prop({ 
     type: Types.ObjectId, 
     ref: 'ChallengeCategory',
-    required: true,
+    required: false,
     index: true 
   })
-  challengeCategory: Types.ObjectId;
+  challengeCategory?: Types.ObjectId;
 
   @Prop({
     type: String,

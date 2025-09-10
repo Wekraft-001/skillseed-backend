@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types, Schema as MongooseSchema } from 'mongoose';
-import { ChallengeType } from '../content/dtos';
+import { AgeRange, ChallengeType } from '../content/dtos';
 
 export type ChallengeDocument = Challenge & Document;
 
@@ -34,11 +34,13 @@ export class Challenge {
   @Prop({ required: true })
   estimatedTime: string;
 
-  @Prop({ type: [String], required: false })
-  materialsNeeded?: string[];
-
-  @Prop({ type: [String], required: true })
-  instructions: string[];
+  @Prop({
+    type: String,
+    enum: AgeRange,
+    required: true,
+    index: true
+  })
+  ageRange: AgeRange;
 
   @Prop({ type: String, required: false })
   imageUrl?: string;

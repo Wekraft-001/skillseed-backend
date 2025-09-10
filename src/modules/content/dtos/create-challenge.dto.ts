@@ -7,6 +7,13 @@ export enum ChallengeType {
   ACTIVITY = 'activity'
 }
 
+export enum AgeRange {
+  AGE_5_TO_8 = '5-8',
+  AGE_9_TO_12 = '9-12',
+  AGE_13_TO_16 = '13-16',
+  AGE_17_PLUS = '17+'
+}
+
 export class CreateChallengeDto {
   @ApiProperty({ description: 'Title of the challenge', example: 'Build a Simple Robot' })
   @IsString()
@@ -38,13 +45,10 @@ export class CreateChallengeDto {
   @IsNotEmpty()
   estimatedTime: string;
 
-  @ApiProperty({ description: 'Materials needed', example: ['Cardboard', 'Scissors', 'Glue'], required: false })
-  @IsOptional()
-  materialsNeeded?: string[];
-
-  @ApiProperty({ description: 'Instructions for the challenge', example: ['Step 1: Cut the cardboard', 'Step 2: Glue the pieces together'] })
+  @ApiProperty({ enum: AgeRange, description: 'Age range for this challenge', example: AgeRange.AGE_9_TO_12 })
+  @IsEnum(AgeRange)
   @IsNotEmpty()
-  instructions: string[];
+  ageRange: AgeRange;
 
   @ApiProperty({ description: 'Image URL', example: 'https://example.com/challenge-image.jpg', required: false })
   @IsOptional()

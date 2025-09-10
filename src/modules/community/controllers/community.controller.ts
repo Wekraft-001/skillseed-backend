@@ -46,8 +46,8 @@ export class CommunityController {
   @Get()
   @ApiOperation({ summary: 'Get all communities (public)' })
   @ApiQuery({ name: 'category', enum: CommunityCategory, required: false, description: 'Filter by legacy category (deprecated)' })
-  @ApiQuery({ name: 'challengeCategory', required: false, description: 'Filter by challenge category ID' })
   @ApiQuery({ name: 'ageGroup', enum: AgeGroup, required: false, description: 'Filter by age group' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by name or description' })
   @ApiQuery({ name: 'search', required: false, description: 'Search by name or description' })
   getAllCommunities(
     @Query() filterDto: FilterCommunityDto,
