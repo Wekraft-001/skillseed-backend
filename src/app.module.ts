@@ -34,6 +34,7 @@ import { StudentDashboardModule } from './modules/dashboard/student/module/dashb
 import { ContentModule } from './modules/content/content.module';
 import { CommunityModule } from './modules/community/community.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { RewardsModule } from './modules/rewards/rewards.module';
     ContentModule,
     CommunityModule,
     RewardsModule,
+    ReportsModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
