@@ -1186,7 +1186,44 @@ export class AiService {
   async generateCareerQuizForUserId(userId: string, userAgeRange: string) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
-    return this.generateCareerQuiz(user as any, userAgeRange);
+    
+    // Get the quiz data from the database
+    const quizDoc = await this.generateCareerQuiz(user as any, userAgeRange);
+    
+    // Format the response to match the guest quiz structure
+    // Convert the flattened questions back to phases structure
+    const phases = [];
+    const questions = quizDoc.questions || [];
+    const funBreaks = quizDoc.funBreaks || [];
+    
+    // If we have phasesData stored, use that directly
+    if (quizDoc.phasesData) {
+      return {
+        quizId: quizDoc._id.toString(),
+        quiz: { phases: quizDoc.phasesData }
+      };
+    }
+    
+    // Otherwise reconstruct phases from questions and funBreaks
+    // This handles legacy data format
+    const questionsPerPhase = Math.ceil(questions.length / 3);
+    
+    for (let i = 0; i < 3; i++) {
+      const startIdx = i * questionsPerPhase;
+      const endIdx = Math.min(startIdx + questionsPerPhase, questions.length);
+      const phaseQuestions = questions.slice(startIdx, endIdx);
+      
+      phases.push({
+        name: `Phase ${i + 1}`,
+        questions: phaseQuestions,
+        funBreak: funBreaks[i] || `Fun break for phase ${i + 1}`
+      });
+    }
+    
+    return {
+      quizId: quizDoc._id.toString(),
+      quiz: { phases }
+    };
   }
 
   async getLatestEducationalContentForUser(userId: string) {
@@ -1201,6 +1238,14 @@ export class AiService {
     return quizId
       ? `guest_quiz:${sessionId}:${quizId}`
       : `guest_quiz:${sessionId}`;
+  }
+  
+  // Helper to extract JSON from OpenAI response text
+  private extractJson(text: string): string {
+    // Extract JSON from the response if it's wrapped in backticks or has extra text
+    const jsonMatch = text.match(/```(?:json)?([\s\S]*?)```/) || 
+                      text.match(/({[\s\S]*})/);
+    return jsonMatch ? jsonMatch[1].trim() : text.trim();
   }
 
   // Generate a guest quiz JSON (no DB writes)
@@ -1219,17 +1264,22 @@ export class AiService {
       messages: [{ role: 'user', content: prompt }],
     });
 
-    let quizJson: any = {};
     try {
-      quizJson = JSON.parse(response.choices[0].message.content || '{}');
-    } catch {
-      throw new BadRequestException('Failed to generate quiz JSON');
-    }
-    if (!quizJson.phases || !Array.isArray(quizJson.phases)) {
-      throw new BadRequestException('Invalid quiz content format');
-    }
+      const contentText = response.choices[0].message.content || '{}';
+      const parsedContent = this.extractJson(contentText);
+      const quiz = JSON.parse(parsedContent);
+      
+      // Validate quiz structure
+      if (!quiz.phases || !Array.isArray(quiz.phases)) {
+        this.logger.error(`Invalid guest quiz format: ${JSON.stringify(quiz)}`);
+        throw new BadRequestException('Invalid quiz content format: phases array is missing');
+      }
 
-    return quizJson;
+      return quiz;
+    } catch (e) {
+      this.logger.error(`Failed to parse guest quiz: ${e.message}`);
+      throw new BadRequestException(`Failed to create quiz: ${e.message}`);
+    }
   }
 
   async generateGuestQuiz(sessionId: string, ageRange: string) {
@@ -1392,49 +1442,104 @@ export class AiService {
 
     const prompt = `
     Create a fun and interactive career discovery quiz for a child aged ${user.age} (age range ${ageRange}).
+    
     Answer scale: ${scale.join(', ')}
-    Generate exactly 30 questions that are appropriate for the age group. Each question must have ${scale.length} multiple-choice answer options matching the scale exactly (e.g., ${scale.join(', ')}).
-    After every 15 questions, there should be a fun break.
-    Format the output as a JSON object with the following structure:
-
+    
+    Generate a quiz with 3 phases, each with 5-10 questions that are appropriate for the age group. 
+    Each question must have ${scale.length} multiple-choice answer options matching the scale exactly in this order: ${scale.join(', ')}.
+    
+    Each phase should have a "name" property and a "funBreak" property describing a fun interactive element.
+    
+    Your response must be a valid JSON object with EXACTLY this structure:
     {
-      "questions": [
+      "phases": [
         {
-          "text": "Question text",
-          "answers": ["${scale[0]}", "${scale[1]}", ..., "${scale[scale.length - 1]}"]
-        },
-        ...
-      ],
-      "funBreaks": [
-        "Fun break description after question 15",
-        "Fun break description after question 30"
+          "name": "Phase name",
+          "questions": [
+            {
+              "text": "Question text",
+              "answers": ["${scale[0]}", "${scale[1]}", "${scale[2]}", "${scale[3]}", "${scale[4]}"]
+            }
+          ],
+          "funBreak": "Fun break description for this phase"
+        }
       ]
     }
 
-    Ensure the questions are engaging, age-appropriate, and encourage self-reflection. The fun breaks should be interactive and rewarding, like earning badges or unlocking fun animations.
-
-    `;
+    Do not include any text before or after the JSON. Return only the JSON object.
+    Ensure the questions are engaging, age-appropriate, and encourage self-reflection.`;
 
     const response = await this.openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const quizContent = JSON.parse(response.choices[0].message.content || '{}');
-    if (!quizContent.phases || !Array.isArray(quizContent.phases)) {
-      throw new BadRequestException('Invalid quiz content format');
+    try {
+      const contentText = response.choices[0].message.content || '{}';
+      this.logger.debug(`Raw quiz response: ${contentText}`);
+      
+      // Extract and parse JSON from the response
+      const parsedContent = this.extractJson(contentText);
+      const quizContent = JSON.parse(parsedContent);
+      
+      // Validate quiz structure
+      if (!quizContent.phases || !Array.isArray(quizContent.phases)) {
+        this.logger.error(`Invalid quiz content format: ${JSON.stringify(quizContent)}`);
+        throw new BadRequestException('Invalid quiz content format: phases array is missing or not an array');
+      }
+
+      // Validate each phase
+      for (let i = 0; i < quizContent.phases.length; i++) {
+        const phase = quizContent.phases[i];
+        if (!phase.name || !phase.questions || !Array.isArray(phase.questions) || !phase.funBreak) {
+          this.logger.error(`Invalid phase format at index ${i}: ${JSON.stringify(phase)}`);
+          throw new BadRequestException(`Invalid phase format at index ${i}: missing name, funBreak, or questions array`);
+        }
+        
+        // Validate questions and answers
+        for (let j = 0; j < phase.questions.length; j++) {
+          const question = phase.questions[j];
+          if (!question.text || !question.answers || !Array.isArray(question.answers) || question.answers.length !== scale.length) {
+            this.logger.error(`Invalid question format at phase ${i}, question ${j}: ${JSON.stringify(question)}`);
+            throw new BadRequestException(`Invalid question format at phase ${i}, question ${j}: missing text or incorrect number of answers`);
+          }
+        }
+      }
+
+      // Flatten questions and collect fun breaks for database structure
+      const flattenedQuestions = [];
+      const funBreaks = [];
+      
+      quizContent.phases.forEach(phase => {
+        funBreaks.push(phase.funBreak);
+        phase.questions.forEach(question => {
+          flattenedQuestions.push({
+            text: question.text,
+            answers: question.answers,
+          });
+        });
+      });
+
+      const quiz = await this.quizModel.create({
+        user: user._id,
+        ageRange,
+        questions: flattenedQuestions,
+        funBreaks: funBreaks,
+        completed: false,
+        userAnswers: [],
+        analysis: '',
+        // Store original phases structure for the frontend
+        phasesData: quizContent.phases
+      });
+
+      return quiz;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Error parsing quiz content: ${error.message}`, error.stack);
+      throw new BadRequestException(`Error parsing quiz content: ${error.message}`);
     }
-
-    const quiz = await this.quizModel.create({
-      user: user._id,
-      ageRange,
-      phases: quizContent.phases,
-      completed: false,
-      answers: [],
-      analysis: '',
-    });
-
-    return quiz;
   }
 
   async getAllQuizzes(currentUser: User): Promise<CareerQuiz[]> {
