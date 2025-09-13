@@ -88,6 +88,44 @@ export class EmailService {
       console.error('❌ Failed to send email:', error);
     }
   }
+
+  async sendStudentOnboardingEmail(
+    parentEmail: string,
+    studentName: string,
+    password: string,
+    dashboardUrl: string,
+  ) {
+    const mailOptions = {
+      from: process.env.MAIL_FROM,
+      to: parentEmail,
+      subject: `Welcome to Skillseed – ${studentName}'s Account Details`,
+      html: `
+        <p>Hi there,</p>
+        <p>Your child <strong>${studentName}</strong> has been successfully registered on <strong>Skillseed</strong> 🎉</p>
+        
+        <p>Here are the login details for the student account:</p>
+        <ul>
+          <li><strong>Dashboard:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
+          <li><strong>Password:</strong> ${password}</li>
+        </ul>
+  
+        <p>We recommend that your child updates this password after their first login for security.</p>
+        
+        <p>We’re excited to have ${studentName} onboard and can’t wait to see their learning journey grow 🚀</p>
+  
+        <p>Best regards,</p>
+        <p><strong>The Skillseed Team</strong></p>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Student onboarding email sent:', info.response);
+    } catch (error) {
+      console.error('❌ Failed to send student onboarding email:', error);
+    }
+  }
+
   async sendExpiredSubscriptionEmail(email: string, firstName: string) {
     const mailOptions = {
       from: process.env.MAIL_FROM,
@@ -104,16 +142,22 @@ export class EmailService {
 
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Expiration email sent:', info.response)
-      
+      console.log('✅ Expiration email sent:', info.response);
     } catch (error) {
       console.log('❌ Failed to send expiration email:', error);
     }
   }
 
-  async sendCredentialApprovedEmail(email: string, firstName: string, credentialType: string) {
-    const credentialName = credentialType === 'government_id' ? 'Government ID' : 'Professional Credentials';
-    
+  async sendCredentialApprovedEmail(
+    email: string,
+    firstName: string,
+    credentialType: string,
+  ) {
+    const credentialName =
+      credentialType === 'government_id'
+        ? 'Government ID'
+        : 'Professional Credentials';
+
     const mailOptions = {
       from: process.env.MAIL_FROM,
       to: email,
@@ -137,9 +181,17 @@ export class EmailService {
     }
   }
 
-  async sendCredentialRejectedEmail(email: string, firstName: string, credentialType: string, rejectionReason: string) {
-    const credentialName = credentialType === 'government_id' ? 'Government ID' : 'Professional Credentials';
-    
+  async sendCredentialRejectedEmail(
+    email: string,
+    firstName: string,
+    credentialType: string,
+    rejectionReason: string,
+  ) {
+    const credentialName =
+      credentialType === 'government_id'
+        ? 'Government ID'
+        : 'Professional Credentials';
+
     const mailOptions = {
       from: process.env.MAIL_FROM,
       to: email,

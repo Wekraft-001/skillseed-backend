@@ -22,6 +22,7 @@ import { ParentLearningActivitiesService } from '../services/learning-activities
 import { ParentResourcesController } from '../controllers/resources.controller';
 import { ParentResourcesService } from '../services/resources.service';
 import { ContentModule } from 'src/modules/content/content.module';
+import { EmailModule } from 'src/common/utils/mailing/email.module';
 
 @Module({
   imports: [
@@ -37,9 +38,18 @@ import { ContentModule } from 'src/modules/content/content.module';
     forwardRef(() => PaymentModule),
     forwardRef(() => AiModule),
     ContentModule,
+    EmailModule,
   ],
-  controllers: [ParentDashboardController, ParentLearningActivitiesController, ParentResourcesController],
-  providers: [ParentDashboardService, ParentLearningActivitiesService, ParentResourcesService],
+  controllers: [
+    ParentDashboardController,
+    ParentLearningActivitiesController,
+    ParentResourcesController,
+  ],
+  providers: [
+    ParentDashboardService,
+    ParentLearningActivitiesService,
+    ParentResourcesService,
+  ],
   exports: [ParentDashboardService],
 })
 export class ParentDashboardModule {}

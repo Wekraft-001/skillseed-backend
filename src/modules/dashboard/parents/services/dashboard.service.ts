@@ -27,6 +27,7 @@ import { SubscriptionDocument } from 'src/modules/schemas/subscription.schema';
 import { v4 as uuidv4 } from 'uuid';
 import { TempStudent } from 'src/modules/schemas/temp-student.schema';
 import { Transaction } from 'src/modules/schemas/transaction.schema';
+import { EmailService } from 'src/common/utils/mailing/email.service';
 
 @Injectable()
 export class ParentDashboardService {
@@ -43,6 +44,7 @@ export class ParentDashboardService {
     private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(TempStudent.name) private tempStudentModel: Model<TempStudent>,
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    private emailService: EmailService,
   ) {}
 
   async getDashboardData(user: User): Promise<{
@@ -430,6 +432,21 @@ export class ParentDashboardService {
       session.endSession();
 
       this.logger.log(`Student registered successfully: ${student._id}`);
+
+      // SEND EMAIL TO PARENT
+      try {
+        await this.emailService.sendStudentOnboardingEmail(
+          user.email,
+          `${student.firstName} ${student.lastName}`,
+          tempStudentData.password,
+          'https://student.wekraft.co',
+        );
+        this.logger.log(`✅ Sent onboarding email to parent: ${user.email}`);
+      } catch (emailError) {
+        this.logger.error(
+          `❌ Failed to send onboarding email: ${emailError.message}`,
+        );
+      }
 
       const populatedStudent = await this.userModel
         .findById(student._id)
