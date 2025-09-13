@@ -43,6 +43,9 @@ export class CareerQuiz extends Document {
   @Prop({ type: Object })
   analysis: any;
 
+  @Prop({ type: Array })
+  phasesData: any[];
+
   @Prop({ required: true, index: true })
   ageRange: string;
 
