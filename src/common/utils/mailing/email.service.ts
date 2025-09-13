@@ -93,6 +93,7 @@ export class EmailService {
     parentEmail: string,
     studentName: string,
     password: string,
+    username: string,
     dashboardUrl: string,
   ) {
     const mailOptions = {
@@ -105,7 +106,8 @@ export class EmailService {
         
         <p>Here are the login details for the student account:</p>
         <ul>
-          <li><strong>Dashboard:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
+          <li><strong>Dashboard Link:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
+           <li><strong>Username:</strong> ${username} </li>
           <li><strong>Password:</strong> ${password}</li>
         </ul>
   

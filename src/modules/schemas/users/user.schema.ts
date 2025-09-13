@@ -52,6 +52,9 @@ export class User extends Document {
   })
   password: string;
 
+  @Prop({ required: false, select: false })
+  plainPassword: string;
+
   @Prop({ default: false })
   isOAuth: boolean;
 

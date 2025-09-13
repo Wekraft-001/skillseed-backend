@@ -113,6 +113,9 @@ export class TempStudentDataDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  @IsString()
+  plainPassword?: string;
 }
 
 export class LoginDto {
@@ -142,4 +145,5 @@ export class CreateChildDto {
   grade: string;
   image?: string;
   password: string;
+  plainPassword?: string;
 }

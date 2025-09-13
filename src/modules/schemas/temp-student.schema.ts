@@ -6,18 +6,18 @@ import { UserRole } from 'src/common/interfaces';
 export class TempStudent extends Document {
   @Prop({ required: true })
   childTempId: string;
-  
+
   @Prop({ required: true })
   firstName: string;
 
   @Prop({ required: true })
   lastName: string;
-  
+
   @Prop()
   age: number;
 
-  @Prop({required: true})
-  role: UserRole.STUDENT
+  @Prop({ required: true })
+  role: UserRole.STUDENT;
 
   @Prop()
   grade: string;
@@ -30,8 +30,11 @@ export class TempStudent extends Document {
 
   @Prop()
   paymentUrl: string;
+
+  @Prop({ required: false })
+  plainPassword?: string;
 }
 
 export const TempStudentSchema = SchemaFactory.createForClass(TempStudent);
 
-TempStudentSchema.index({createdAt: 1}, { expireAfterSeconds: 3600});
+TempStudentSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3600 });
