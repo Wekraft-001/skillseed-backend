@@ -35,6 +35,7 @@ import { ContentModule } from './modules/content/content.module';
 import { CommunityModule } from './modules/community/community.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { SuperAdminModule } from './modules/super_admin/super_admin.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     CommunityModule,
     RewardsModule,
     ReportsModule,
+    SuperAdminModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],

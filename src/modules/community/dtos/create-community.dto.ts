@@ -19,6 +19,11 @@ export class CreateCommunityDto {
   @IsOptional()
   category?: CommunityCategory;
 
+  @ApiProperty({ description: 'ID of the category for this community', example: '60d21b4667d0d8992e610c85', required: false })
+  @IsMongoId()
+  @IsOptional()
+  categoryId?: string;
+
   @ApiProperty({ enum: AgeGroup, description: 'Age group for this community', example: AgeGroup.AGE_9_TO_12 })
   @IsEnum(AgeGroup)
   @IsNotEmpty()
