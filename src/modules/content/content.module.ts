@@ -12,7 +12,7 @@ import {
   UserSchema 
 } from '../schemas';
 import { ContentController } from './controllers/content.controller';
-import { ChallengeCategoryController } from './controllers/challenge-category.controller';
+// Import removed for deprecated challenge-category controller
 import { ContentService } from './services/content.service';
 import { ChallengeCategoryService } from './services/challenge-category.service';
 
@@ -26,7 +26,7 @@ import { ChallengeCategoryService } from './services/challenge-category.service'
     ]),
     LoggerModule,
   ],
-  controllers: [ContentController, ChallengeCategoryController],
+  controllers: [ContentController], // Removed ChallengeCategoryController
   providers: [ContentService, ChallengeCategoryService],
   exports: [ContentService, ChallengeCategoryService],
 })

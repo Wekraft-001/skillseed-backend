@@ -32,9 +32,12 @@ export class CommunityController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create new community (Super Admin only)' })
-  @ApiBody({ type: CreateCommunityDto })
+  @ApiBody({ 
+    type: CreateCommunityDto,
+    description: 'Create a new community with name, description, age group, and optional category ID'
+  })
   @ApiResponse({ status: 201, description: 'Community successfully created' })
-  @ApiResponse({ status: 400, description: 'Bad request - invalid data or challenge category not found' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid data or category not found' })
   @ApiResponse({ status: 403, description: 'Forbidden - only super admins can create communities' })
   createCommunity(
     @CurrentUser() user: User,
@@ -46,8 +49,8 @@ export class CommunityController {
   @Get()
   @ApiOperation({ summary: 'Get all communities (public)' })
   @ApiQuery({ name: 'category', enum: CommunityCategory, required: false, description: 'Filter by legacy category (deprecated)' })
+  @ApiQuery({ name: 'categoryId', required: false, description: 'Filter by category ID' })
   @ApiQuery({ name: 'ageGroup', enum: AgeGroup, required: false, description: 'Filter by age group' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by name or description' })
   @ApiQuery({ name: 'search', required: false, description: 'Search by name or description' })
   getAllCommunities(
     @Query() filterDto: FilterCommunityDto,

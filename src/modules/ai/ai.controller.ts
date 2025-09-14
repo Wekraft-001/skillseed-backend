@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards, Logger } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,6 +11,8 @@ import { SubmitAnswersDto, UserRole } from 'src/common/interfaces';
 @Controller('ai')
 @ApiTags('AI')
 export class AiController {
+  private readonly logger = new Logger(AiController.name);
+  
   constructor(private readonly aiService: AiService) {}
 
   // Signed-in student quiz creation
@@ -77,13 +79,56 @@ export class AiController {
       type: 'object',
       properties: {
         childId: { type: 'string', description: 'Required if caller is parent or school_admin' },
+        quizId: { type: 'string', description: 'ID of the specific quiz to use for recommendations' },
       },
     },
   })
-  generateRecommendations(@CurrentUser() user: User, @Body() body: { childId?: string }) {
+  generateRecommendations(
+    @CurrentUser() user: User, 
+    @Body() body: { childId?: string; quizId?: string },
+    @Query('quizId') queryQuizId?: string
+  ) {
     const targetUserId =
       user.role === UserRole.STUDENT ? (user as any)._id : body.childId;
-    return this.aiService.generateEducationalContent(targetUserId as any);
+    // Use quizId from query parameters or body
+    const quizId = queryQuizId || body.quizId;
+    return this.aiService.generateEducationalContent(targetUserId as any, quizId);
+  }
+
+  // Also support GET method for recommendations
+  @Get('recommendations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.STUDENT, UserRole.PARENT, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get educational content recommendations for a student' })
+  getRecommendations(
+    @CurrentUser() user: User, 
+    @Query('childId') childId?: string,
+    @Query('quizId') quizId?: string
+  ) {
+    this.logger.log(`GET recommendations for user ${user._id} with childId ${childId || 'N/A'} and quizId ${quizId || 'N/A'}`);
+    const targetUserId =
+      user.role === UserRole.STUDENT ? (user as any)._id : childId;
+    return this.aiService.generateEducationalContent(targetUserId as any, quizId);
+  }
+  
+  @Post('recommendations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.STUDENT, UserRole.PARENT, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get educational content recommendations for a student (POST method)' })
+  postRecommendations(
+    @CurrentUser() user: User, 
+    @Body() body: { childId?: string; quizId?: string },
+    @Query('childId') queryChildId?: string,
+    @Query('quizId') queryQuizId?: string
+  ) {
+    const childId = body.childId || queryChildId;
+    const quizId = body.quizId || queryQuizId;
+    
+    this.logger.log(`POST recommendations for user ${user._id} with childId ${childId || 'N/A'} and quizId ${quizId || 'N/A'}`);
+    
+    const targetUserId =
+      user.role === UserRole.STUDENT ? (user as any)._id : childId;
+    return this.aiService.generateEducationalContent(targetUserId as any, quizId);
   }
 
   // Signed-in latest content access

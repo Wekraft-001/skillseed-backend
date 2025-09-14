@@ -41,13 +41,29 @@ export class CommunityService {
         throw new ForbiddenException('Only super admins can create communities');
       }
 
+      // If categoryId is provided, validate it exists
+      if (createCommunityDto.categoryId) {
+        const category = await this.challengeCategoryModel.findById(createCommunityDto.categoryId);
+        if (!category) {
+          throw new BadRequestException(`Category with ID ${createCommunityDto.categoryId} not found`);
+        }
+        
+        this.logger.log(`Creating community with category: ${category.name} (${createCommunityDto.categoryId})`);
+      }
+
       const newCommunity = new this.communityModel({
         ...createCommunityDto,
+        // Set the challengeCategory field if categoryId is provided
+        ...(createCommunityDto.categoryId && { challengeCategory: new Types.ObjectId(createCommunityDto.categoryId) }),
         members: [],
         createdBy: new Types.ObjectId(userId),
       });
 
-      return await newCommunity.save();
+      const savedCommunity = await newCommunity.save();
+      
+      this.logger.log(`Created community: ${savedCommunity._id} with name ${savedCommunity.name}`);
+      
+      return savedCommunity;
     } catch (error) {
       this.logger.error(`Error creating community: ${error.message}`, error.stack);
       throw error;
@@ -66,6 +82,10 @@ export class CommunityService {
       if (filterDto.ageGroup) {
         query.ageGroup = filterDto.ageGroup;
       }
+
+      if (filterDto.categoryId) {
+        query.challengeCategory = new Types.ObjectId(filterDto.categoryId);
+      }
       
       if (filterDto.search) {
         query.$or = [
@@ -75,7 +95,8 @@ export class CommunityService {
       }
 
       const communities = await this.communityModel.find(query)
-        .select('name description category members')
+        .select('name description category challengeCategory ageGroup members createdAt')
+        .populate('challengeCategory', 'name icon description')
         .sort({ name: 1 })
         .exec();
 
@@ -93,6 +114,7 @@ export class CommunityService {
     try {
       const community = await this.communityModel.findById(communityId)
         .populate('members', 'firstName lastName image')
+        .populate('challengeCategory', 'name icon description')
         .exec();
       
       if (!community) {
