@@ -1184,45 +1184,21 @@ export class AiService {
 
   // Signed-in helpers (use existing logic but by userId)
   async generateCareerQuizForUserId(userId: string, userAgeRange: string) {
+    this.logger.log(`Generating quiz for user ${userId} with age range ${userAgeRange}`);
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
     
     // Get the quiz data from the database
     const quizDoc = await this.generateCareerQuiz(user as any, userAgeRange);
     
-    // Format the response to match the guest quiz structure
-    // Convert the flattened questions back to phases structure
-    const phases = [];
-    const questions = quizDoc.questions || [];
-    const funBreaks = quizDoc.funBreaks || [];
+    this.logger.log(`Created quiz with ID: ${quizDoc._id.toString()} for user ${userId}`);
     
-    // If we have phasesData stored, use that directly
-    if (quizDoc.phasesData) {
-      return {
-        quizId: quizDoc._id.toString(),
-        quiz: { phases: quizDoc.phasesData }
-      };
-    }
-    
-    // Otherwise reconstruct phases from questions and funBreaks
-    // This handles legacy data format
-    const questionsPerPhase = Math.ceil(questions.length / 3);
-    
-    for (let i = 0; i < 3; i++) {
-      const startIdx = i * questionsPerPhase;
-      const endIdx = Math.min(startIdx + questionsPerPhase, questions.length);
-      const phaseQuestions = questions.slice(startIdx, endIdx);
-      
-      phases.push({
-        name: `Phase ${i + 1}`,
-        questions: phaseQuestions,
-        funBreak: funBreaks[i] || `Fun break for phase ${i + 1}`
-      });
-    }
-    
+    // Return the quiz with a simplified format (no phases)
     return {
       quizId: quizDoc._id.toString(),
-      quiz: { phases }
+      quiz: {
+        questions: quizDoc.questions
+      }
     };
   }
 
@@ -1257,29 +1233,176 @@ export class AiService {
       );
     }
 
-    const prompt = `Create a JSON career discovery quiz with 3 phases for age range ${ageRange}.\nEach phase must include 3-6 questions and each question must include exactly 5 answers.\nOutput strictly JSON with shape {"phases":[{"name":"...","questions":[{"text":"...","answers":["a","b","c","d","e"]}],"funBreak":"..."}]}`;
+    // Predefined scales for different age ranges
+    const ageScales = {
+      '6-8': [
+        '😞 Not at all',
+        '😐 A little',
+        '🙂 Sometimes',
+        '😀 Often',
+        '🤩 A lot',
+      ],
+      '9-12': ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'],
+      '13-15': [
+        'Strongly Disagree',
+        'Disagree',
+        'Neutral',
+        'Agree',
+        'Strongly Agree',
+      ],
+      '16-18': ['Very Untrue', 'Untrue', 'Neutral', 'True', 'Very True'],
+    };
 
-    const response = await this.openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-    });
+    // Predefined questions for each age range
+    const predefinedQuestions = {
+      '6-8': [
+        'How much do you like drawing or coloring?',
+        'Do you enjoy playing with puzzles or brain games?',
+        'How much fun is it to build with blocks or LEGOs?',
+        'Do you like playing pretend (like doctor or teacher)?',
+        'Do you enjoy helping someone bake or cook?',
+        'Do you like singing or dancing to music?',
+        'Do you enjoy telling stories or making up adventures?',
+        'How much do you like caring for animals or pets?',
+        'Do you enjoy reading books or listening to stories?',
+        'Do you like making your own crafts or toys?',
+        'Are you good at remembering things?',
+        'Do you help others clean up or organize?',
+        'Do you like trying things again if they don\'t work the first time?',
+        'Can you sit still and listen when someone is talking?',
+        'Are you good at saying how you feel?',
+        'Can you notice how others feel (sad, happy)?',
+        'Do you enjoy fixing or improving things?',
+        'Do you like sharing your things with others?',
+        'Can you stay calm when things go wrong?',
+        'Do you enjoy learning something new?',
+        'Would you want to fly a rocket to the moon?',
+        'Would you like to design your own theme park?',
+        'Would you enjoy being the teacher for a day?',
+        'Would you want to take care of animals in a zoo?',
+        'Would you love to make a movie about your life?',
+        'Would you build a robot to help people?',
+        'Would you design cool clothes or costumes?',
+        'Would you invent a new toy?',
+        'Would you like to be on stage performing?',
+        'Would you create a storybook for other kids?'
+      ],
+      '9-12': [
+        'I enjoy reading and learning new facts.',
+        'I like building, fixing, or inventing things.',
+        'I enjoy acting, singing, or performing.',
+        'I like helping my classmates or friends.',
+        'I enjoy using computers or tablets to create.',
+        'I like planning or organizing things.',
+        'I enjoy drawing, painting, or making art.',
+        'I like working on challenges or brain games.',
+        'I enjoy writing stories, poems, or comics.',
+        'I enjoy exploring how things work.',
+        'I like starting and finishing tasks on my own.',
+        'I get excited about solving difficult problems.',
+        'I enjoy working with others in groups.',
+        'I get frustrated when things don\'t go my way.',
+        'I keep my work neat and organized.',
+        'I ask lots of questions when learning.',
+        'I enjoy leading projects or group tasks.',
+        'I usually double-check my work.',
+        'I enjoy following step-by-step instructions.',
+        'I can keep working even when it\'s hard.',
+        'I would love to be a scientist or researcher.',
+        'I want to be a teacher or mentor one day.',
+        'I would enjoy creating games or animations.',
+        'I\'m interested in becoming a doctor or nurse.',
+        'I\'d love to be a chef or food artist.',
+        'I want to write books or scripts.',
+        'I\'d enjoy being a lawyer or public speaker.',
+        'I want to travel the world to help others.',
+        'I want to be a leader who changes things.',
+        'I\'d like to be on stage or in movies.'
+      ],
+      '13-15': [
+        'I often question how things work.',
+        'I like coming up with new solutions.',
+        'I notice small details others don\'t.',
+        'I\'m curious about how people think.',
+        'I like imagining different futures or realities.',
+        'I enjoy learning about current events.',
+        'I want to understand how systems work (e.g., apps, businesses).',
+        'I get excited by deep discussions.',
+        'I enjoy analyzing people\'s behavior.',
+        'I like connecting different ideas together.',
+        'I like being a team leader.',
+        'I help keep peace in a group.',
+        'I support others when they\'re upset.',
+        'I\'m comfortable speaking up with ideas.',
+        'I like planning events or group tasks.',
+        'I often encourage others to keep going.',
+        'I enjoy group debates or discussions.',
+        'I help organize people or materials.',
+        'I try to listen before I speak.',
+        'I\'m good at resolving problems in teams.',
+        'I want to be my own boss or entrepreneur.',
+        'I dream of working with cutting-edge technology.',
+        'I\'d love to do work that helps the planet.',
+        'I see myself as a future inventor or designer.',
+        'I want to influence policies or laws.',
+        'I imagine myself on a creative team.',
+        'I\'m passionate about solving real-world problems.',
+        'I\'d like to build or manage big projects.',
+        'I\'d love to mentor or coach others.',
+        'I want to work globally and travel.'
+      ],
+      '16-18': [
+        'I want to make an impact in people\'s lives.',
+        'I value independence and autonomy in work.',
+        'I enjoy being challenged mentally.',
+        'I care deeply about fairness and justice.',
+        'I\'m drawn to beauty, art, or expression.',
+        'I enjoy leading people or ideas.',
+        'I find meaning in solving complex problems.',
+        'I believe in building communities.',
+        'I thrive when I\'m learning something new.',
+        'I value freedom to create my own path.',
+        'I\'m able to make decisions under pressure.',
+        'I can manage multiple tasks effectively.',
+        'I prefer structure over open-ended tasks.',
+        'I enjoy organizing ideas or systems.',
+        'I\'m confident presenting or pitching.',
+        'I stay calm and focused when things are unclear.',
+        'I work best when I know the purpose behind a task.',
+        'I like collaborating with others to get results.',
+        'I\'m comfortable giving and receiving feedback.',
+        'I adapt quickly when plans change.',
+        'I\'m interested in launching my own business.',
+        'I want to solve health or science problems.',
+        'I\'d love to create visual content or design.',
+        'I want to research and innovate in tech.',
+        'I\'d enjoy shaping education or policy.',
+        'I want to lead others toward a big goal.',
+        'I\'d thrive in a creative or storytelling role.',
+        'I want a career that allows me to travel.',
+        'I\'m passionate about social change.',
+        'I want to develop new ideas that don\'t exist yet.'
+      ]
+    };
 
-    try {
-      const contentText = response.choices[0].message.content || '{}';
-      const parsedContent = this.extractJson(contentText);
-      const quiz = JSON.parse(parsedContent);
-      
-      // Validate quiz structure
-      if (!quiz.phases || !Array.isArray(quiz.phases)) {
-        this.logger.error(`Invalid guest quiz format: ${JSON.stringify(quiz)}`);
-        throw new BadRequestException('Invalid quiz content format: phases array is missing');
-      }
+    // Get the appropriate scale and questions for the user's age range
+    const scale = ageScales[ageRange];
+    const questions = predefinedQuestions[ageRange];
 
-      return quiz;
-    } catch (e) {
-      this.logger.error(`Failed to parse guest quiz: ${e.message}`);
-      throw new BadRequestException(`Failed to create quiz: ${e.message}`);
+    if (!scale || !questions) {
+      throw new BadRequestException('Failed to get questions for the specified age range');
     }
+
+    // Format questions with their answer scales
+    const formattedQuestions = questions.map(text => ({
+      text,
+      answers: scale
+    }));
+
+    // Return the quiz with questions only (no phases)
+    return {
+      questions: formattedQuestions
+    };
   }
 
   async generateGuestQuiz(sessionId: string, ageRange: string) {
@@ -1432,11 +1555,15 @@ export class AiService {
     };
 
     let ageRange: string;
-    if (user.age >= 6 && user.age <= 8) ageRange = '6-8';
-    else if (user.age >= 9 && user.age <= 12) ageRange = '9-12';
-    else if (user.age >= 13 && user.age <= 15) ageRange = '13-15';
-    else if (user.age >= 16 && user.age <= 17) ageRange = '16-18';
-    else throw new BadRequestException('Age must be between 6 and 17');
+    // Use the provided userAgeRange parameter instead of calculating from user.age
+    ageRange = userAgeRange;
+    
+    // Log which age range we're using
+    this.logger.log(`Using age range: ${ageRange} for user ${user._id} (actual age: ${user.age})`);
+    
+    if (!ageScales[ageRange]) {
+      throw new BadRequestException(`Invalid age range: ${ageRange}. Must be one of: ${Object.keys(ageScales).join(', ')}`);
+    }
 
     const { scale, funBreak } = ageScales[ageRange];
 
@@ -1551,13 +1678,22 @@ export class AiService {
   }
 
   async analyzeAnswers(dto: SubmitAnswersDto): Promise<any> {
+    this.logger.log(`Analyzing answers for quiz ${dto.quizId}`);
+    
     const quiz = await this.quizModel
       .findById(dto.quizId)
       .populate('user')
       .exec();
-    if (!quiz) throw new NotFoundException('Quiz not found');
+    
+    if (!quiz) {
+      this.logger.error(`Quiz not found in analyzeAnswers with ID: ${dto.quizId}`);
+      throw new NotFoundException('Quiz not found');
+    }
+
+    this.logger.log(`Found quiz in analyzeAnswers: ${quiz._id.toString()}, user: ${quiz.user._id.toString()}`);
 
     if (!dto.answers || !Array.isArray(dto.answers)) {
+      this.logger.error('Answers array is missing or invalid');
       throw new BadRequestException('Answers array is missing or invalid');
     }
 
@@ -1589,7 +1725,7 @@ export class AiService {
 
     const prompt = `Given the following answers from a child... 
       You are a career counselor analyzing a student's responses to career assessment questions. 
-      Based on the following questions and answers, provide a brief up to 4 sentence but yet comprehensive career analysis and recommendations.
+      Based on the following questions and answers, provide a short human toned up to 4 sentence career analysis and recommendations.
 
       ${answersText.join('\n\n')}
 
@@ -1600,7 +1736,7 @@ export class AiService {
       4. Educational recommendations
       5. Next steps for career exploration
 
-      Format your response in a clear, encouraging manner suitable for a student.
+      Format your response in a clear, encouraging manner suitable for a curious student.
   `.trim();
 
     const response = await this.openai.chat.completions.create({
@@ -1609,11 +1745,19 @@ export class AiService {
     });
 
     const analysis = response.choices[0].message.content || '';
+    this.logger.log(`Generated analysis for quiz ${dto.quizId}: ${analysis.substring(0, 100)}...`);
 
     quiz.userAnswers = dto.answers;
     quiz.completed = true;
     quiz.analysis = analysis;
-    await quiz.save();
+    
+    try {
+      await quiz.save();
+      this.logger.log(`Successfully saved quiz ${dto.quizId} with completed status and analysis`);
+    } catch (error) {
+      this.logger.error(`Error saving quiz ${dto.quizId}: ${error.message}`);
+      throw new Error(`Failed to save quiz: ${error.message}`);
+    }
 
     return {
       analysis,
@@ -1624,25 +1768,39 @@ export class AiService {
   }
 
   async submitAnswers(dto: SubmitAnswersDto, userId: string) {
+    this.logger.log(`Attempting to submit answers for quiz ${dto.quizId} from user ${userId}`);
+    
     const quiz = await this.quizModel
       .findById(dto.quizId)
       .populate('user')
       .exec();
-    if (!quiz) throw new NotFoundException('Quiz not found');
+    
+    if (!quiz) {
+      this.logger.error(`Quiz not found with ID: ${dto.quizId}`);
+      throw new NotFoundException('Quiz not found');
+    }
+
+    this.logger.log(`Found quiz: ${quiz._id.toString()}, completed: ${quiz.completed}, user: ${quiz.user._id.toString()}`);
 
     if (quiz.user._id.toString() !== userId.toString()) {
+      this.logger.error(`User ${userId} not authorized to submit answers for quiz ${dto.quizId} owned by ${quiz.user._id.toString()}`);
       throw new BadRequestException(
         'You are not authorized to submit answers for this quiz',
       );
     }
 
-    if (quiz.completed) throw new BadRequestException('Quiz already completed');
+    if (quiz.completed) {
+      this.logger.warn(`Quiz ${dto.quizId} is already completed`);
+      throw new BadRequestException('Quiz already completed');
+    }
 
     this.logger.log(
       `Received answers for quiz ${dto.quizId}: ${JSON.stringify(dto.answers)}`,
     );
 
-    return this.analyzeAnswers(dto);
+    const result = await this.analyzeAnswers(dto);
+    this.logger.log(`Successfully analyzed answers for quiz ${dto.quizId}, completed: ${result.quizId}`);
+    return result;
   }
 
   async generateProfileOutcome(dto: SubmitAnswersDto, userId: string) {
@@ -1679,18 +1837,68 @@ export class AiService {
 
   async generateEducationalContent(
     userId: string,
+    quizId?: string
   ): Promise<EducationalContent> {
+    this.logger.log(`Generating educational content for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+    
     const user = await this.userModel.findById(userId).exec();
 
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) {
+      this.logger.error(`User not found: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+    
+    this.logger.log(`Found user: ${user._id}, age: ${user.age}, role: ${user.role}`);
+    
     if (user.role !== UserRole.STUDENT) {
+      this.logger.error(`User ${userId} role is ${user.role}, not STUDENT`);
       throw new BadRequestException('Only students can generate content');
     }
 
-    const latestQuiz = await this.getLatestQuiz(userId);
-    if (!latestQuiz || !latestQuiz.analysis) {
-      throw new BadRequestException('No completed quiz found');
+    let latestQuiz = null;
+    
+    try {
+      // First try to get quiz directly from database if we have a quiz ID
+      if (quizId) {
+        this.logger.log(`Attempting direct lookup of quiz ${quizId} by ID`);
+        try {
+          latestQuiz = await this.quizModel.findById(quizId).exec();
+          if (latestQuiz) {
+            this.logger.log(`Direct lookup successful for quiz ${quizId}, completed: ${latestQuiz.completed}, has analysis: ${!!latestQuiz.analysis}`);
+            
+            // If quiz doesn't belong to user, log a warning but still use it
+            if (latestQuiz.user.toString() !== userId.toString()) {
+              this.logger.warn(`Quiz ${quizId} belongs to user ${latestQuiz.user}, not ${userId}, but proceeding anyway`);
+            }
+          } else {
+            this.logger.warn(`Direct lookup failed, quiz ${quizId} not found`);
+          }
+        } catch (error) {
+          this.logger.error(`Error in direct quiz lookup: ${error.message}`);
+        }
+      }
+      
+      // If direct lookup failed or no quizId provided, try getLatestQuiz
+      if (!latestQuiz) {
+        this.logger.log(`Falling back to getLatestQuiz method for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+        latestQuiz = await this.getLatestQuiz(userId, quizId);
+      }
+      
+      if (!latestQuiz) {
+        this.logger.error(`No quiz found for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+        throw new BadRequestException('No quiz found');
+      }
+      
+      if (!latestQuiz.completed || !latestQuiz.analysis) {
+        this.logger.error(`Quiz ${latestQuiz._id} found but not completed or missing analysis. Completed: ${latestQuiz.completed}, Has analysis: ${!!latestQuiz.analysis}`);
+        throw new BadRequestException('Quiz is not complete or missing analysis');
+      }
+    } catch (error) {
+      this.logger.error(`Error finding quiz: ${error.message}`);
+      throw new BadRequestException(`Unable to find quiz: ${error.message}`);
     }
+    
+    this.logger.log(`Using quiz ${latestQuiz._id} to generate educational content`);
 
     const prompt = `Generate personalized educational content for a ${user.age}-year-old child named ${user.firstName}.
     
@@ -1698,12 +1906,10 @@ Based on the quiz analysis: ${latestQuiz.analysis}, create a custom learning pla
 
 1. Videos: Suggest 3-5 educational YouTube videos. Include title and URL.
 2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, and educational theme.
-3. Games: Suggest 3-5 free educational games or activities. Include name, URL (if online), and skills they develop.
 
-Format your response as a JSON object with three keys:
+Format your response as a JSON object with two keys:
 - "video": array of {title, url} objects
 - "books": array of {title, author, level, theme} objects - ONLY FREE AND OPEN SOURCE BOOKS
-- "games": array of {name, url, skill} objects
 
 For example:
 {
@@ -1714,10 +1920,6 @@ For example:
   "books": [
     {"title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "level": "Intermediate", "theme": "Imagination"},
     {"title": "The Wonderful Wizard of Oz", "author": "L. Frank Baum", "level": "Intermediate", "theme": "Adventure"}
-  ],
-  "games": [
-    {"name": "ScratchJr", "url": "https://www.scratchjr.org/", "skill": "Coding"},
-    {"name": "Prodigy Math", "url": "https://www.prodigygame.com/", "skill": "Math"}
   ]
 }`;
 
@@ -1735,16 +1937,71 @@ For example:
       user: user._id,
       videoUrl: JsonEducationContent.video || [],
       books: JsonEducationContent.books || [],
-      games: JsonEducationContent.games || [],
+      games: [] // Empty games array since we're removing games
     });
 
     return educationalContent;
   }
 
-  private async getLatestQuiz(userId: string): Promise<CareerQuiz | null> {
-    return this.quizModel
-      .findOne({ user: userId, analysis: { $ne: null } })
-      .sort({ createdAt: -1 })
-      .exec();
+  private async getLatestQuiz(userId: string, quizId?: string): Promise<CareerQuiz | null> {
+    this.logger.log(`Getting quiz for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+    
+    // If quizId is provided, try to find that specific quiz first
+    if (quizId) {
+      try {
+        // First, try to find by exact ID match without user filtering
+        const specificQuiz = await this.quizModel
+          .findById(quizId)
+          .exec();
+        
+        if (specificQuiz) {
+          this.logger.log(`Found quiz with ID ${quizId}, owned by user ${specificQuiz.user}, requesting user: ${userId}`);
+          
+          // Check if it belongs to the user
+          if (specificQuiz.user.toString() === userId.toString()) {
+            this.logger.log(`Quiz ${quizId} belongs to user ${userId}, completed: ${specificQuiz.completed}, has analysis: ${!!specificQuiz.analysis}`);
+            return specificQuiz;
+          } else {
+            this.logger.warn(`Quiz ${quizId} found but belongs to user ${specificQuiz.user}, not ${userId}`);
+          }
+        } else {
+          this.logger.warn(`No quiz found with ID ${quizId}`);
+        }
+      } catch (error) {
+        this.logger.error(`Error finding quiz by ID ${quizId}: ${error.message}`);
+      }
+    }
+    
+    // Fall back to the latest quiz with analysis
+    try {
+      const latestQuiz = await this.quizModel
+        .findOne({ user: userId, completed: true })
+        .sort({ updatedAt: -1 })
+        .exec();
+      
+      if (latestQuiz) {
+        this.logger.log(`Found latest quiz: ${latestQuiz._id}, completed: ${latestQuiz.completed}, has analysis: ${!!latestQuiz.analysis}`);
+        return latestQuiz;
+      } else {
+        this.logger.warn(`No completed quizzes found for user ${userId}`);
+        
+        // As a last resort, look for any quiz for this user
+        const anyQuiz = await this.quizModel
+          .findOne({ user: userId })
+          .sort({ updatedAt: -1 })
+          .exec();
+          
+        if (anyQuiz) {
+          this.logger.log(`Found non-completed quiz: ${anyQuiz._id}, completed: ${anyQuiz.completed}, has analysis: ${!!anyQuiz.analysis}`);
+          return anyQuiz;
+        }
+        
+        this.logger.warn(`No quizzes at all found for user ${userId}`);
+        return null;
+      }
+    } catch (error) {
+      this.logger.error(`Error finding latest quiz: ${error.message}`);
+      return null;
+    }
   }
 }
