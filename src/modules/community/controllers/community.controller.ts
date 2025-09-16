@@ -21,7 +21,7 @@ import { AgeGroup, CommunityCategory } from '../../schemas/community.schema';
 import { SeedCommunitiesService } from '../commands/seed-communities.command';
 
 @Controller('communities')
-@ApiTags('Communities')
+@ApiTags('COMMUNITY MANAGEMENT')
 export class CommunityController {
   constructor(
     private readonly communityService: CommunityService,

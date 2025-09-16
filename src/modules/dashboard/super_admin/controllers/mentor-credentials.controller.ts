@@ -30,7 +30,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
 
 @Controller('mentor-credentials')
-@ApiTags('Mentor Credentials')
+@ApiTags('MENTOR DASHBOARD')
 export class MentorCredentialController {
   constructor(
     private readonly mentorCredentialService: MentorCredentialService,

@@ -13,8 +13,10 @@ import { SubscriptionService } from 'src/subscription/subscription.service';
 import { CardPaymentRequest, SubscriptionStatus, PaymentStatus } from 'src/common/interfaces';
 import { Request, Response } from 'express';
 import { LoggerService } from 'src/common/logger/logger.service';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('payments')
+@ApiTags('PAYMENT')
 export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,

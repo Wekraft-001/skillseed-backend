@@ -17,7 +17,7 @@ import { User } from 'src/modules/schemas';
 @Controller('parent/dashboard/learning-activities')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.PARENT)
-@ApiTags('Parent Dashboard')
+@ApiTags('PARENT DASHBOARD')
 export class ParentLearningActivitiesController {
   constructor(
     private readonly learningActivitiesService: ParentLearningActivitiesService,

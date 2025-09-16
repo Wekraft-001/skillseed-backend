@@ -25,7 +25,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 
 @Controller('transactions')
-@ApiTags('Admin Transactions')
+@ApiTags('SUPERADMIN DASHBOARD')
 export class TransactionController {
   constructor(
     private transactionService: TransactionService,

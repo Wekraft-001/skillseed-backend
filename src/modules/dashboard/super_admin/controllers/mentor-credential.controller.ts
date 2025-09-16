@@ -29,7 +29,7 @@ import { User } from 'src/modules/schemas';
 import { MentorCredentialService } from '../services/mentor-credential.service';
 
 @Controller('admin/mentor-credentials')
-@ApiTags('Mentor Credential Management')
+@ApiTags('MENTOR DASHBOARD')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)
 export class MentorCredentialController {

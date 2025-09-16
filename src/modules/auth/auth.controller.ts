@@ -40,6 +40,7 @@ import { ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { AuthTokenResponseDto } from 'src/common/interfaces';
 
 @Controller('auth')
+@ApiTags('AUTH')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -189,7 +190,6 @@ export class AuthController {
   // }
 
   @Post('register')
-  @ApiTags('Authentication')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -204,7 +204,6 @@ export class AuthController {
   }
 
   @Post('signin')
-  @ApiTags('Authentication')
   @UsePipes(new SanitizePipe())
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
@@ -217,7 +216,6 @@ export class AuthController {
   }
 
   @Post('parent/signin')
-  @ApiTags('Authentication')
   @ApiOperation({ summary: 'Parent sign in' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
   @ApiResponse({
@@ -234,7 +232,6 @@ export class AuthController {
   }
 
   @Post('mentor/signin')
-  @ApiTags('Mentor Authentication')
   @ApiOperation({ summary: 'Mentor sign in' })
   @ApiResponse({
     status: 200,
@@ -250,7 +247,6 @@ export class AuthController {
   // Mentors can only be registered by super admins through the admin dashboard
 
   @Post('parent/register')
-  @ApiTags('Authentication')
   @ApiOperation({ summary: 'Parent self-registration' })
   @ApiResponse({
     status: HttpStatus.CREATED,

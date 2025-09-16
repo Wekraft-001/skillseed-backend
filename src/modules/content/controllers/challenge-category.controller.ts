@@ -19,7 +19,7 @@ import { CurrentUser } from 'src/common/decorators';
 import { User } from 'src/modules/schemas';
 
 @Controller('challenge-categories')
-@ApiTags('Challenge Categories')
+@ApiTags('CONTENT MANAGEMENT')
 export class ChallengeCategoryController {
   constructor(private readonly challengeCategoryService: ChallengeCategoryService) {}
 

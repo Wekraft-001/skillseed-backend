@@ -18,7 +18,7 @@ import { User } from 'src/modules/schemas';
 @Controller('school/dashboard/challenges')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SCHOOL_ADMIN)
-@ApiTags('School Dashboard')
+@ApiTags('SCHOOL DASHBOARD')
 export class SchoolChallengesController {
   constructor(
     private readonly challengesService: SchoolChallengesService,

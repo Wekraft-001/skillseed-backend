@@ -29,6 +29,7 @@ import {
   ApiConsumes,
   ApiOperation,
   ApiResponse,
+  ApiTags
 } from '@nestjs/swagger';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from 'src/common/decorators';
@@ -36,6 +37,7 @@ import { CurrentUser } from 'src/common/decorators';
 @Controller('mentor/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.MENTOR)
+@ApiTags('MENTOR DASHBOARD')
 export class MentorDashboardController {
   constructor(
     private readonly mentorDashboardService: MentorDashboardService,

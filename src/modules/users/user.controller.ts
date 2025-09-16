@@ -34,6 +34,7 @@ import {
 import { RolesGuard } from '../auth/guards/roles.guard';
 
 @Controller('users')
+@ApiTags('STUDENT DASHBOARD')
 export class UserController {
   constructor(
     private readonly aiService: AiService,
@@ -171,7 +172,7 @@ export class UserController {
     return this.aiService.submitAnswers(answersDto, (user as any)._id);
   }
 
-  @ApiTags('Generate profile outcome')
+  @ApiTags('STUDENT DASHBOARD')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Generate profile outcome based on quiz ID' })
   @ApiResponse({
@@ -182,19 +183,8 @@ export class UserController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  @ApiTags('Profile Outcome')
-  @ApiBearerAuth()
-  @ApiResponse({
-    status: 200,
-    description: 'Profile outcome generated successfully',
-  })
-  @ApiResponse({ status: 400, description: 'Bad request - Quiz ID is invalid' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.STUDENT)
-  @UseGuards(AuthGuard('jwt'))
   @Post('quiz/:id/generate-profile')
   async generateProfileOutCome(
     @Param('id') quizId: string,

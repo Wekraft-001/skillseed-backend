@@ -74,16 +74,22 @@ export class StudentDashboardService {
   }
 
   async generateRecommendations(student: User) {
-    // Generate new educational content recommendations
-    const newContent = await this.aiService.generateEducationalContent(
-      student._id.toString(),
-    );
+    try {
+      // Generate new educational content recommendations
+      const newContent = await this.aiService.generateEducationalContent(
+        student._id.toString(),
+      );
 
-    // Save the new content and return the saved document
-    return await this.eduContentModel.create({
-      ...newContent,
-      user: student._id,
-    });
+      // Save the new content and return the saved document
+      return await this.eduContentModel.create({
+        ...newContent,
+        user: student._id,
+      });
+    } catch (error) {
+      this.logger.warn(`Unable to generate recommendations for student ${student._id}: ${error.message}`);
+      // Return null to indicate no recommendations could be generated
+      return null;
+    }
   }
 
   async getRecommendations(student: User) {

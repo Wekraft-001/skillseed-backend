@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards, Logger } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards, Logger, BadRequestException } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,7 +9,7 @@ import { User } from '../schemas';
 import { SubmitAnswersDto, UserRole } from 'src/common/interfaces';
 
 @Controller('ai')
-@ApiTags('AI')
+@ApiTags('AI TOOLS')
 export class AiController {
   private readonly logger = new Logger(AiController.name);
   
@@ -62,6 +62,19 @@ export class AiController {
       required: ['quizId', 'answers'],
     },
   })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns quiz analysis with user information',
+    schema: {
+      type: 'object',
+      properties: {
+        analysis: { type: 'object', description: 'Analysis of the quiz answers' },
+        quizId: { type: 'string', description: 'The ID of the completed quiz' },
+        answers: { type: 'array', description: 'The submitted answers' },
+        user: { type: 'object', description: 'Complete user information' }
+      }
+    }
+  })
   submitQuiz(
     @CurrentUser() user: User,
     @Body() body: SubmitAnswersDto,
@@ -93,6 +106,103 @@ export class AiController {
     // Use quizId from query parameters or body
     const quizId = queryQuizId || body.quizId;
     return this.aiService.generateEducationalContent(targetUserId as any, quizId);
+  }
+
+  @Get('career-recommendations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.STUDENT, UserRole.PARENT, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get career recommendations based on completed quiz' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns career recommendations based on quiz analysis',
+    schema: {
+      type: 'object',
+      properties: {
+        traits: {
+          type: 'array',
+          description: 'Personality traits identified from the quiz',
+          items: {
+            type: 'object',
+            properties: {
+              emoji: { type: 'string', example: '🎨' },
+              trait: { type: 'string', example: 'Creative Mind' },
+              description: { type: 'string', example: 'You love expressing yourself through art and creativity!' }
+            }
+          }
+        },
+        careers: {
+          type: 'array',
+          description: 'Career recommendations with match percentages',
+          items: {
+            type: 'object',
+            properties: {
+              emoji: { type: 'string', example: '🎨' },
+              career: { type: 'string', example: 'Artist' },
+              matchPercentage: { type: 'number', example: 98 }
+            }
+          }
+        },
+        quizId: { type: 'string', description: 'ID of the quiz used for recommendations' },
+        completedAt: { type: 'string', format: 'date-time', description: 'When the quiz was completed' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No completed quiz found or unable to extract recommendations'
+  })
+  getCareerRecommendations(
+    @CurrentUser() user: User,
+    @Query('childId') childId?: string,
+    @Query('quizId') quizId?: string,
+    @Body() body?: { quizId?: string }
+  ) {
+    // If childId is provided and user is a parent or school admin, get recommendations for the child
+    // Otherwise, get recommendations for the current user
+    const targetId = (childId && (user.role === UserRole.PARENT || user.role === UserRole.SCHOOL_ADMIN))
+      ? childId
+      : (user as any)._id;
+    
+    // Use quizId from query params, body, or undefined
+    const targetQuizId = quizId || (body && body.quizId);
+      
+    return this.aiService.getCareerRecommendations(targetId, targetQuizId);
+  }
+  
+  // Debug endpoint to get the raw quiz analysis (only in development mode)
+  @Get('quiz-analysis')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.STUDENT, UserRole.PARENT, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get raw quiz analysis for debugging (development only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns the raw quiz analysis text',
+    schema: {
+      type: 'object',
+      properties: {
+        analysis: { type: 'string', description: 'Raw analysis text from the quiz' },
+        quizId: { type: 'string', description: 'ID of the quiz' },
+        completed: { type: 'boolean', description: 'Whether the quiz was completed' },
+        updatedAt: { type: 'string', format: 'date-time', description: 'When the quiz was last updated' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'No quiz found'
+  })
+  async getQuizAnalysis(
+    @CurrentUser() user: User,
+    @Query('quizId') quizId?: string,
+    @Body() body?: { quizId?: string }
+  ) {
+    // Only allow in development mode
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('This endpoint is only available in development mode');
+    }
+    
+    const targetQuizId = quizId || (body && body.quizId);
+    return this.aiService.getQuizAnalysis((user as any)._id, targetQuizId);
   }
 
   // Also support GET method for recommendations

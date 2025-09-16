@@ -20,7 +20,7 @@ import { AgeGroup, CommunityCategory } from 'src/modules/schemas/community.schem
 @Controller('student/dashboard/communities')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.STUDENT)
-@ApiTags('Student Dashboard')
+@ApiTags('STUDENT DASHBOARD')
 export class StudentCommunitiesController {
   constructor(
     private readonly communitiesService: StudentCommunitiesService,

@@ -17,7 +17,7 @@ import { User } from 'src/modules/schemas';
 @Controller('mentor/dashboard/resources')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.MENTOR)
-@ApiTags('Mentor Dashboard')
+@ApiTags('MENTOR DASHBOARD')
 export class MentorResourcesController {
   constructor(
     private readonly resourcesService: MentorResourcesService,

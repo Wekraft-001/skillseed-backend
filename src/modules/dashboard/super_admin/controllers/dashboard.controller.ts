@@ -26,6 +26,7 @@ import { User } from '../../../schemas';
 import { ApiResponseDto } from 'src/common/interfaces/api-response.dto';
 
 @Controller('dashboard')
+@ApiTags('SUPERADMIN DASHBOARD')
 export class DashboardController {
   constructor(
     private readonly dashboardService: DashboardService,
@@ -34,8 +35,6 @@ export class DashboardController {
 
   @Get('get-data')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
-  @ApiTags('Dashboard')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({

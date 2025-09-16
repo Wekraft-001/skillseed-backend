@@ -23,7 +23,7 @@ import { RewardsService } from 'src/modules/rewards/rewards.service';
 @Controller('student/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.STUDENT)
-@ApiTags('Student Dashboard')
+@ApiTags('STUDENT DASHBOARD')
 export class StudentDashboardController {
   constructor(
     private readonly studentDashboardService: StudentDashboardService,
