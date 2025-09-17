@@ -33,6 +33,7 @@ import {
 @Controller('parent/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.PARENT)
+@ApiTags('PARENT DASHBOARD')
 export class ParentDashboardController {
   constructor(
     private readonly parentDashboardService: ParentDashboardService,

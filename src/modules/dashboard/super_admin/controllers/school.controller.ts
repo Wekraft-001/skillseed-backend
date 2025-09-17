@@ -31,7 +31,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('schools')
-@ApiTags('School Management')
+@ApiTags('SUPERADMIN DASHBOARD')
 export class SchoolController {
   constructor(
     private readonly schoolOnboardingService: SchoolOnboardingService,

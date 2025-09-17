@@ -8,7 +8,7 @@ import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { CategoryService } from '../services/category.service';
 
 @Controller('super-admin/categories/public')
-@ApiTags('Categories - Public')
+@ApiTags('COMMUNITY MANAGEMENT')
 export class CategoryPublicController {
   constructor(private readonly categoryService: CategoryService) {}
 

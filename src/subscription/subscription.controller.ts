@@ -39,9 +39,11 @@ import { create } from 'domain';
 import { ParentDashboardService } from 'src/modules/dashboard/parents/services/dashboard.service';
 import { use } from 'passport';
 import { ConfigService } from '@nestjs/config';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('subscriptions')
 @UseGuards(JwtAuthGuard)
+@ApiTags('SUBSCRIPTION')
 export class SubscriptionController {
   constructor(
     private subscriptionService: SubscriptionService,

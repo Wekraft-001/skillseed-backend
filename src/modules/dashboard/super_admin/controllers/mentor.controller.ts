@@ -28,7 +28,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('mentors')
-@ApiTags('Mentor Management')
+@ApiTags('SUPERADMIN DASHBOARD')
 export class MentorController {
   constructor(
     private readonly mentorOnboardingService: MentorOnboardingService,

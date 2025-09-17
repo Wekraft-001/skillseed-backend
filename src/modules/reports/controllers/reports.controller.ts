@@ -18,7 +18,7 @@ import { UserRole } from 'src/common/interfaces';
 import { LoggerService } from 'src/common/logger/logger.service';
 
 @Controller('reports')
-@ApiTags('Reports')
+@ApiTags('REPORTS')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ReportsController {
   constructor(

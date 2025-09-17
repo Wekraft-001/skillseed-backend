@@ -18,7 +18,7 @@ import { CreateContentDto, CreateChallengeDto, FilterContentDto, ContentType, Co
 import { UserRole } from 'src/common/interfaces';
 
 @Controller('content')
-@ApiTags('Content')
+@ApiTags('CONTENT MANAGEMENT')
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 

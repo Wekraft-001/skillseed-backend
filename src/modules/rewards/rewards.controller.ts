@@ -19,7 +19,7 @@ import { User, BadgeTier } from '../schemas';
 @Controller('student/rewards')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.STUDENT)
-@ApiTags('Student Rewards')
+@ApiTags('STUDENT DASHBOARD')
 export class RewardsController {
   constructor(private readonly rewardsService: RewardsService) {}
 

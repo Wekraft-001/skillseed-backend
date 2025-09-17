@@ -17,7 +17,7 @@ import { User } from 'src/modules/schemas';
 @Controller('school/dashboard/content')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SCHOOL_ADMIN)
-@ApiTags('School Dashboard')
+@ApiTags('SCHOOL DASHBOARD')
 export class SchoolContentController {
   constructor(
     private readonly contentService: SchoolContentService,

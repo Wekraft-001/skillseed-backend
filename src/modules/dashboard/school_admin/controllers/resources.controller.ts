@@ -17,7 +17,7 @@ import { User } from 'src/modules/schemas';
 @Controller('school/dashboard/resources')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SCHOOL_ADMIN)
-@ApiTags('School Dashboard')
+@ApiTags('SCHOOL DASHBOARD')
 export class SchoolResourcesController {
   constructor(
     private readonly resourcesService: SchoolResourcesService,

@@ -20,7 +20,7 @@ import { RewardsService } from 'src/modules/rewards/rewards.service';
 @Controller('student/dashboard/challenges')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.STUDENT)
-@ApiTags('Student Dashboard')
+@ApiTags('STUDENT DASHBOARD')
 export class StudentChallengesController {
   constructor(
     private readonly challengesService: StudentChallengesService,

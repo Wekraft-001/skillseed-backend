@@ -17,7 +17,7 @@ import { User } from 'src/modules/schemas';
 @Controller('parent/dashboard/parental-resources')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.PARENT)
-@ApiTags('Parent Dashboard')
+@ApiTags('PARENT DASHBOARD')
 export class ParentResourcesController {
   constructor(
     private readonly resourcesService: ParentResourcesService,

@@ -1677,7 +1677,12 @@ export class AiService {
     return await this.quizModel.find().populate('user').exec();
   }
 
-  async analyzeAnswers(dto: SubmitAnswersDto): Promise<any> {
+  async analyzeAnswers(dto: SubmitAnswersDto): Promise<{
+    analysis: any;
+    quizId: string;
+    userId: string;
+    answers: { questionIndex: number; answer: string }[];
+  }> {
     this.logger.log(`Analyzing answers for quiz ${dto.quizId}`);
     
     const quiz = await this.quizModel
@@ -1799,8 +1804,19 @@ export class AiService {
     );
 
     const result = await this.analyzeAnswers(dto);
+    
+    // Get the complete user information
+    const user = await this.userModel.findById(result.userId)
+      .select('-password')  // Exclude sensitive information
+      .exec();
+      
+    // Include user details in the response
     this.logger.log(`Successfully analyzed answers for quiz ${dto.quizId}, completed: ${result.quizId}`);
-    return result;
+    return {
+      ...result,
+      userId: undefined,  // Remove the userId field as we're including the full user object
+      user: user          // Include the full user object
+    };
   }
 
   async generateProfileOutcome(dto: SubmitAnswersDto, userId: string) {
@@ -2002,6 +2018,300 @@ For example:
     } catch (error) {
       this.logger.error(`Error finding latest quiz: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Get the raw quiz analysis for debugging purposes
+   */
+  async getQuizAnalysis(userId: string, quizId?: string) {
+    try {
+      const quiz = await this.getLatestQuiz(userId, quizId);
+      
+      if (!quiz) {
+        throw new BadRequestException('No quiz found');
+      }
+      
+      return {
+        quizId: quiz._id.toString(),
+        analysis: quiz.analysis || 'No analysis available',
+        completed: quiz.completed,
+        updatedAt: (quiz as any).updatedAt || new Date()
+      };
+    } catch (error) {
+      this.logger.error(`Error getting quiz analysis: ${error.message}`);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Unable to get quiz analysis: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Get career recommendations from a user's quiz analysis
+   * This extracts the career recommendations and their match percentages
+   * from the AI-generated analysis text
+   */
+  async getCareerRecommendations(userId: string, quizId?: string) {
+    try {
+      this.logger.log(`Getting career recommendations for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+      
+      // Find the latest completed quiz with analysis
+      const quiz = await this.getLatestQuiz(userId, quizId);
+      
+      if (!quiz || !quiz.completed || !quiz.analysis) {
+        this.logger.warn(`No completed quiz with analysis found for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+        throw new BadRequestException('No completed quiz found. Please complete a career assessment quiz first.');
+      }
+      
+      // Log a sample of the analysis for debugging
+      this.logger.debug(`Quiz analysis sample (first 200 chars): ${quiz.analysis.substring(0, 200)}`);
+      this.logger.debug(`Analysis length: ${quiz.analysis.length} characters`);
+      
+      // Parse the analysis to extract personality traits and career recommendations
+      const traits = this.extractPersonalityTraits(quiz.analysis);
+      const careers = this.extractCareerRecommendations(quiz.analysis);
+      
+      this.logger.log(`Extracted ${traits.length} traits and ${careers.length} career recommendations`);
+      
+      // If both are empty, log more details about the analysis
+      if (traits.length === 0 && careers.length === 0) {
+        this.logger.warn('Failed to extract any traits or careers. Analysis format may be unexpected.');
+        this.logger.debug(`Analysis format check: Contains newlines: ${quiz.analysis.includes('\n')}`);
+        this.logger.debug(`Analysis format check: Contains emojis: ${/[^\w\s]/.test(quiz.analysis)}`);
+        this.logger.debug(`Analysis format check: Contains percentages: ${quiz.analysis.includes('%')}`);
+        
+        // Try a simple fallback extraction as a last resort
+        const fallbackResults = this.simpleFallbackExtraction(quiz.analysis);
+        traits.push(...fallbackResults.traits);
+        careers.push(...fallbackResults.careers);
+      }
+      
+      return {
+        traits,
+        careers,
+        quizId: quiz._id.toString(),
+        completedAt: new Date()
+      };
+    } catch (error) {
+      this.logger.error(`Error getting career recommendations: ${error.message}`);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Unable to get career recommendations: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Extract personality traits from the quiz analysis
+   */
+  private extractPersonalityTraits(analysis: string): Array<{trait: string, description: string, emoji: string}> {
+    // Initialize with empty array in case we can't extract traits
+    const traits = [];
+    
+    try {
+      // Look for personality traits in the analysis text
+      // Common patterns in the analysis text based on the UI example
+      const traitRegex = /(🎨|🔬|👥|🧠|🌟|🔍|🚀|🌱|🎭|📚|✏️|💡)\s*([\w\s]+)\s*([\w\s,!]+)/g;
+      
+      let match;
+      while ((match = traitRegex.exec(analysis)) !== null) {
+        traits.push({
+          emoji: match[1],
+          trait: match[2].trim(),
+          description: match[3].trim()
+        });
+      }
+      
+      // If regex didn't find anything, try to extract sections manually
+      if (traits.length === 0) {
+        // Split by double newlines and look for emoji + text patterns
+        const sections = analysis.split('\n\n');
+        for (const section of sections) {
+          // If section starts with emoji and doesn't contain "Career" (to avoid capturing career recommendations)
+          if (/^[^\w\s]/.test(section) && !section.includes("Career")) {
+            const lines = section.split('\n');
+            if (lines.length >= 2) {
+              const emoji = lines[0].trim().charAt(0);
+              const trait = lines[0].trim().substring(1).trim();
+              const description = lines.slice(1).join(' ').trim();
+              
+              traits.push({ emoji, trait, description });
+            }
+          }
+        }
+      }
+      
+      return traits;
+    } catch (error) {
+      this.logger.warn(`Error extracting personality traits: ${error.message}`);
+      return traits; // Return empty array if extraction fails
+    }
+  }
+  
+  /**
+   * Extract career recommendations from the quiz analysis
+   */
+  private extractCareerRecommendations(analysis: string): Array<{career: string, matchPercentage: number, emoji: string}> {
+    // Initialize with empty array in case we can't extract careers
+    const careers = [];
+    
+    try {
+      // Look for career recommendations in the analysis text
+      // Format based on the UI example: "Artist - 98% Match"
+      const careerRegex = /(🎨|🔬|👩‍🏫|👨‍💻|🧑‍🔬|🧑‍🎨|🧑‍⚕️|🧑‍🚒|🧑‍🔧|🧑‍💼|✈️)\s*([\w\s]+)\s*(?:-)?([\d]+)%\s*Match/gi;
+      
+      let match;
+      while ((match = careerRegex.exec(analysis)) !== null) {
+        careers.push({
+          emoji: match[1],
+          career: match[2].trim(),
+          matchPercentage: parseInt(match[3], 10)
+        });
+      }
+      
+      // If regex didn't find anything, try to extract career sections manually
+      if (careers.length === 0) {
+        // Look for a section that mentions careers
+        const sections = analysis.split('\n\n');
+        let careerSection = '';
+        
+        for (const section of sections) {
+          if (section.toLowerCase().includes('career') || section.toLowerCase().includes('match')) {
+            careerSection = section;
+            break;
+          }
+        }
+        
+        if (careerSection) {
+          const careerLines = careerSection.split('\n');
+          for (const line of careerLines) {
+            // Try to extract career and percentage
+            const basicMatch = line.match(/([\w\s]+)\s*-?\s*([\d]+)%/i);
+            if (basicMatch) {
+              // Try to find an emoji
+              const emoji = line.match(/([^\w\s])/)?.[1] || '🌟';
+              
+              careers.push({
+                emoji,
+                career: basicMatch[1].trim(),
+                matchPercentage: parseInt(basicMatch[2], 10)
+              });
+            }
+          }
+        }
+      }
+      
+      // Sort by match percentage (highest first)
+      return careers.sort((a, b) => b.matchPercentage - a.matchPercentage);
+    } catch (error) {
+      this.logger.warn(`Error extracting career recommendations: ${error.message}`);
+      return careers; // Return empty array if extraction fails
+    }
+  }
+  
+  /**
+   * Simple fallback extraction for when regular expressions fail
+   * This uses a more aggressive approach to find any content that looks like traits or careers
+   */
+  private simpleFallbackExtraction(analysis: string) {
+    const result = {
+      traits: [],
+      careers: []
+    };
+    
+    try {
+      // Split by any combination of newlines or multiple spaces
+      const lines = analysis.split(/[\n\s]{2,}/);
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // Skip empty lines
+        if (!trimmedLine) continue;
+        
+        // Look for percentage matches which likely indicate careers
+        if (trimmedLine.includes('%')) {
+          // Attempt to extract a career and percentage
+          const parts = trimmedLine.split(/[-–]/); // Handle different dash types
+          
+          if (parts.length >= 1) {
+            // The career name should be in the first part
+            const careerName = parts[0].trim();
+            
+            // Try to extract a percentage from any part
+            let matchPercentage = 0;
+            for (const part of parts) {
+              const percentMatch = part.match(/([\d]+)%/);
+              if (percentMatch) {
+                matchPercentage = parseInt(percentMatch[1], 10);
+                break;
+              }
+            }
+            
+            // Only add if we have both a career name and a percentage
+            if (careerName && matchPercentage > 0) {
+              // Try to find an emoji at the start
+              const emoji = /^[^\w\s]/.test(careerName) ? careerName.charAt(0) : '🌟';
+              
+              // Clean the career name if it starts with an emoji
+              const cleanCareerName = /^[^\w\s]/.test(careerName) 
+                ? careerName.substring(1).trim() 
+                : careerName;
+              
+              result.careers.push({
+                emoji,
+                career: cleanCareerName,
+                matchPercentage
+              });
+            }
+          }
+        }
+        // If the line has at least 15 characters and doesn't have a percentage, it might be a trait
+        else if (trimmedLine.length > 15 && !trimmedLine.toLowerCase().includes('career')) {
+          // Try to find an emoji at the start
+          const emoji = /^[^\w\s]/.test(trimmedLine) ? trimmedLine.charAt(0) : '🧠';
+          
+          // Extract the trait name (first few words)
+          const words = trimmedLine.split(' ');
+          let traitName = '';
+          let description = '';
+          
+          if (words.length > 3) {
+            // Use first 2-3 words as the trait name
+            traitName = words.slice(0, 3).join(' ');
+            // Rest is the description
+            description = words.slice(3).join(' ');
+          } else {
+            // If very short, just use it as a trait name
+            traitName = trimmedLine;
+            description = 'This is one of your personality traits.';
+          }
+          
+          // Clean the trait name if it starts with an emoji
+          const cleanTraitName = /^[^\w\s]/.test(traitName) 
+            ? traitName.substring(1).trim() 
+            : traitName;
+          
+          result.traits.push({
+            emoji,
+            trait: cleanTraitName,
+            description
+          });
+        }
+      }
+      
+      // Sort careers by match percentage
+      result.careers.sort((a, b) => b.matchPercentage - a.matchPercentage);
+      
+      // Limit to reasonable numbers
+      result.traits = result.traits.slice(0, 5);
+      result.careers = result.careers.slice(0, 5);
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in fallback extraction: ${error.message}`);
+      return result; // Return empty arrays if fallback fails
     }
   }
 }

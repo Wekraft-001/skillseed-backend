@@ -21,11 +21,12 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from 'src/modules/schemas';
 import { Model } from 'mongoose';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @Controller('school/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SCHOOL_ADMIN)
+@ApiTags('SCHOOL DASHBOARD')
 export class SchoolDashboardController {
   constructor(
     private readonly schoolDashboardService: SchoolDashboardService,
