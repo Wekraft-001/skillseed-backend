@@ -11,6 +11,11 @@ import {
 import { School, User } from '../../../schemas/index';
 import { CreateStudentDto } from 'src/modules/auth/dtos';
 import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
+import { ContentService } from 'src/modules/content/services/content.service';
+import {
+  FilterContentDto,
+  FilterContentWithoutCategoryDto,
+} from 'src/modules/content/dtos';
 
 @Injectable()
 export class SchoolDashboardService {
@@ -20,6 +25,8 @@ export class SchoolDashboardService {
 
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
+
+    private readonly contentService: ContentService,
 
     private readonly logger: LoggerService,
   ) {}
@@ -200,47 +207,6 @@ export class SchoolDashboardService {
   }
 
   // Update a child's details
-  async updateStudentt(
-    studentId: string,
-    updateData: Partial<CreateStudentDto>,
-    currentUser: User,
-    image?: Express.Multer.File,
-  ) {
-    if (currentUser.role !== UserRole.SCHOOL_ADMIN) {
-      throw new BadRequestException('Only School Admin can update students.');
-    }
-
-    const student = await this.userModel.findById(studentId);
-    if (!student || student.role !== UserRole.STUDENT) {
-      throw new BadRequestException('Student not found.');
-    }
-
-    if (student.createdBy.toString() !== currentUser._id.toString()) {
-      throw new BadRequestException('You cannot update this student.');
-    }
-
-    const updatePayload: any = { ...updateData };
-
-    // Handle image separately
-    if (image) {
-      const imageUrl = await uploadToAzureStorage(image);
-      updatePayload.image = imageUrl;
-    }
-
-    // Hash password if provided
-    if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 10);
-    }
-
-    // Update the student
-    await this.userModel.findByIdAndUpdate(studentId, updateData, {
-      new: true,
-    });
-
-    // Return updated student with populated createdBy
-    return this.userModel.findById(studentId).populate('createdBy');
-  }
-
   async updateStudent(
     studentId: string,
     updateData: Partial<CreateStudentDto>,
@@ -302,5 +268,26 @@ export class SchoolDashboardService {
     await this.userModel.deleteOne({ _id: student._id });
 
     return { success: true, message: 'Student deleted successfully' };
+  }
+
+  // CONTENT FOR SCHOOL DASHBOARD
+  async getContent(userId: string, filterDto: FilterContentWithoutCategoryDto) {
+    const fullFilterDto: FilterContentDto = {
+      ...filterDto,
+    };
+    return this.contentService.getContentForUser(userId, fullFilterDto);
+  }
+
+  async getResources(
+    userId: string,
+    filterDto: FilterContentWithoutCategoryDto,
+  ) {
+    // Convert to standard filter DTO but without category
+    const standardFilterDto: FilterContentDto = {
+      type: filterDto.type,
+      search: filterDto.search,
+    };
+
+    return this.contentService.getContentForUser(userId, standardFilterDto);
   }
 }

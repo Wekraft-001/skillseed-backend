@@ -7,13 +7,13 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { 
-  ChallengeCategory, 
-  ChallengeCategoryDocument, 
-  Community, 
-  CommunityDocument, 
-  User, 
-  UserDocument 
+import {
+  Category,
+  CategoryDocument,
+  Community,
+  CommunityDocument,
+  User,
+  UserDocument,
 } from 'src/modules/schemas';
 import { CreateCommunityDto, FilterCommunityDto } from '../dtos';
 import { UserRole } from 'src/common/interfaces';
@@ -21,51 +21,71 @@ import { UserRole } from 'src/common/interfaces';
 @Injectable()
 export class CommunityService {
   constructor(
-    @InjectModel(Community.name) private communityModel: Model<CommunityDocument>,
+    @InjectModel(Community.name)
+    private communityModel: Model<CommunityDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
-    @InjectModel(ChallengeCategory.name) private challengeCategoryModel: Model<ChallengeCategoryDocument>,
+    @InjectModel(Category.name)
+    private challengeCategoryModel: Model<CategoryDocument>,
     private readonly logger: LoggerService,
   ) {
     this.logger.setContext('CommunityService');
   }
 
-  async createCommunity(createCommunityDto: CreateCommunityDto, userId: string) {
+  async createCommunity(
+    createCommunityDto: CreateCommunityDto,
+    userId: string,
+  ) {
     try {
       // Check if user is a super admin
       const user = await this.userModel.findById(userId);
       if (!user) {
         throw new NotFoundException('User not found');
       }
-      
+
       if (user.role !== UserRole.SUPER_ADMIN) {
-        throw new ForbiddenException('Only super admins can create communities');
+        throw new ForbiddenException(
+          'Only super admins can create communities',
+        );
       }
 
       // If categoryId is provided, validate it exists
       if (createCommunityDto.categoryId) {
-        const category = await this.challengeCategoryModel.findById(createCommunityDto.categoryId);
+        const category = await this.challengeCategoryModel.findById(
+          createCommunityDto.categoryId,
+        );
         if (!category) {
-          throw new BadRequestException(`Category with ID ${createCommunityDto.categoryId} not found`);
+          throw new BadRequestException(
+            `Category with ID ${createCommunityDto.categoryId} not found`,
+          );
         }
-        
-        this.logger.log(`Creating community with category: ${category.name} (${createCommunityDto.categoryId})`);
+
+        this.logger.log(
+          `Creating community with category: ${category.name} (${createCommunityDto.categoryId})`,
+        );
       }
 
       const newCommunity = new this.communityModel({
         ...createCommunityDto,
         // Set the challengeCategory field if categoryId is provided
-        ...(createCommunityDto.categoryId && { challengeCategory: new Types.ObjectId(createCommunityDto.categoryId) }),
+        ...(createCommunityDto.categoryId && {
+          challengeCategory: new Types.ObjectId(createCommunityDto.categoryId),
+        }),
         members: [],
         createdBy: new Types.ObjectId(userId),
       });
 
       const savedCommunity = await newCommunity.save();
-      
-      this.logger.log(`Created community: ${savedCommunity._id} with name ${savedCommunity.name}`);
-      
+
+      this.logger.log(
+        `Created community: ${savedCommunity._id} with name ${savedCommunity.name}`,
+      );
+
       return savedCommunity;
     } catch (error) {
-      this.logger.error(`Error creating community: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error creating community: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -74,11 +94,11 @@ export class CommunityService {
     try {
       // Build query based on filters
       const query: any = { isActive: true };
-      
+
       if (filterDto.category) {
         query.category = filterDto.category;
       }
-      
+
       if (filterDto.ageGroup) {
         query.ageGroup = filterDto.ageGroup;
       }
@@ -86,7 +106,7 @@ export class CommunityService {
       if (filterDto.categoryId) {
         query.challengeCategory = new Types.ObjectId(filterDto.categoryId);
       }
-      
+
       if (filterDto.search) {
         query.$or = [
           { name: { $regex: filterDto.search, $options: 'i' } },
@@ -94,39 +114,49 @@ export class CommunityService {
         ];
       }
 
-      const communities = await this.communityModel.find(query)
-        .select('name description category challengeCategory ageGroup members createdAt')
+      const communities = await this.communityModel
+        .find(query)
+        .select(
+          'name description category challengeCategory ageGroup members createdAt',
+        )
         .populate('challengeCategory', 'name icon description')
         .sort({ name: 1 })
         .exec();
 
-      return communities.map(community => ({
+      return communities.map((community) => ({
         ...community.toObject(),
-        memberCount: community.members.length
+        memberCount: community.members.length,
       }));
     } catch (error) {
-      this.logger.error(`Error getting communities: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting communities: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   async getCommunityById(communityId: string) {
     try {
-      const community = await this.communityModel.findById(communityId)
+      const community = await this.communityModel
+        .findById(communityId)
         .populate('members', 'firstName lastName image')
         .populate('challengeCategory', 'name icon description')
         .exec();
-      
+
       if (!community) {
         throw new NotFoundException('Community not found');
       }
 
       return {
         ...community.toObject(),
-        memberCount: community.members.length
+        memberCount: community.members.length,
       };
     } catch (error) {
-      this.logger.error(`Error getting community by ID: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting community by ID: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -149,7 +179,9 @@ export class CommunityService {
 
       // Check if user is already a member
       if (community.members.includes(new Types.ObjectId(userId))) {
-        throw new BadRequestException('User is already a member of this community');
+        throw new BadRequestException(
+          'User is already a member of this community',
+        );
       }
 
       // Add user to community members
@@ -159,10 +191,13 @@ export class CommunityService {
       return {
         message: 'Successfully joined the community',
         communityId: community._id,
-        memberCount: community.members.length
+        memberCount: community.members.length,
       };
     } catch (error) {
-      this.logger.error(`Error joining community: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error joining community: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -176,7 +211,7 @@ export class CommunityService {
 
       // Check if user is a member
       const memberIndex = community.members.findIndex(
-        (memberId) => memberId.toString() === userId
+        (memberId) => memberId.toString() === userId,
       );
 
       if (memberIndex === -1) {
@@ -190,30 +225,37 @@ export class CommunityService {
       return {
         message: 'Successfully left the community',
         communityId: community._id,
-        memberCount: community.members.length
+        memberCount: community.members.length,
       };
     } catch (error) {
-      this.logger.error(`Error leaving community: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error leaving community: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   async getUserCommunities(userId: string) {
     try {
-      const communities = await this.communityModel.find({
-        members: new Types.ObjectId(userId),
-        isActive: true
-      })
-      .select('name description category imageUrl members')
-      .sort({ name: 1 })
-      .exec();
+      const communities = await this.communityModel
+        .find({
+          members: new Types.ObjectId(userId),
+          isActive: true,
+        })
+        .select('name description category imageUrl members')
+        .sort({ name: 1 })
+        .exec();
 
-      return communities.map(community => ({
+      return communities.map((community) => ({
         ...community.toObject(),
-        memberCount: community.members.length
+        memberCount: community.members.length,
       }));
     } catch (error) {
-      this.logger.error(`Error getting user communities: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error getting user communities: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -225,9 +267,11 @@ export class CommunityService {
       if (!user) {
         throw new NotFoundException('User not found');
       }
-      
+
       if (user.role !== UserRole.SUPER_ADMIN) {
-        throw new ForbiddenException('Only super admins can deactivate communities');
+        throw new ForbiddenException(
+          'Only super admins can deactivate communities',
+        );
       }
 
       const community = await this.communityModel.findById(communityId);
@@ -240,7 +284,10 @@ export class CommunityService {
 
       return { message: 'Community successfully deactivated' };
     } catch (error) {
-      this.logger.error(`Error deactivating community: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error deactivating community: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }

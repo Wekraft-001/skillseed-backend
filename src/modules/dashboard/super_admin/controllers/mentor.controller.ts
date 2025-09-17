@@ -18,7 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateMentorDto, UserRole } from 'src/common/interfaces';
-import { MentorOnboardingService } from '../services/mentor-onboarding.service';
+import { MentorOnboardingService } from '../services/mentor.service';
 import { Mentor, User } from 'src/modules/schemas';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';

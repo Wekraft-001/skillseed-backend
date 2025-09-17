@@ -12,8 +12,6 @@ import { User, UserDocument, School, Mentor } from '../schemas';
 import { JwtService } from '@nestjs/jwt';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { UserRole } from 'src/common/interfaces';
-import { RegisterMentorDto } from 'src/common/interfaces';
-import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +28,10 @@ export class AuthService {
     this.logger.setContext(AuthService.name);
   }
 
-  async registerAdminOrParent(createDto: CreateAdminOrParentDto, isOAuth = false) {
+  async registerAdminOrParent(
+    createDto: CreateAdminOrParentDto,
+    isOAuth = false,
+  ) {
     if (![UserRole.SUPER_ADMIN, UserRole.PARENT].includes(createDto.role)) {
       throw new BadRequestException(
         'Only SUPER_ADMIN or PARENT can self-register',
@@ -49,11 +50,13 @@ export class AuthService {
       }
 
       await session.withTransaction(async () => {
-        const hashedPassword = isOAuth ? undefined : await bcrypt.hash(createDto.password, 10);
+        const hashedPassword = isOAuth
+          ? undefined
+          : await bcrypt.hash(createDto.password, 10);
         newUser = new this.userModel({
           ...createDto,
           password: hashedPassword,
-          isOAuth
+          isOAuth,
         });
         await newUser.save({ session });
       });
@@ -65,6 +68,41 @@ export class AuthService {
     } finally {
       await session.endSession();
     }
+  }
+
+  async login(credentials: { email: string; password: string }) {
+    const user = await this.userModel
+      .findOne({ email: credentials.email })
+      .select('+password')
+      .lean();
+
+    if (!user || !(await bcrypt.compare(credentials.password, user.password))) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const payload = {
+      sub: user._id,
+      role: user.role,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phoneNumber: user.phoneNumber,
+      school: user.school,
+      createdBy: user.createdBy,
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        _id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        school: user.school,
+        role: user.role,
+        createdBy: user.createdBy,
+      },
+    };
   }
 
   async childLogin(credentials: { firstName: string; password: string }) {
@@ -102,41 +140,6 @@ export class AuthService {
         school: childUser.school,
         role: childUser.role,
         createdBy: childUser.createdBy,
-      },
-    };
-  }
-
-  async login(credentials: { email: string; password: string }) {
-    const user = await this.userModel
-      .findOne({ email: credentials.email })
-      .select('+password')
-      .lean();
-
-    if (!user || !(await bcrypt.compare(credentials.password, user.password))) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const payload = {
-      sub: user._id,
-      role: user.role,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phoneNumber: user.phoneNumber,
-      school: user.school,
-      createdBy: user.createdBy,
-    };
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        _id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        school: user.school,
-        role: user.role,
-        createdBy: user.createdBy,
       },
     };
   }
@@ -221,113 +224,5 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       user: mentor,
     };
-  }
-
-  async parentSignin(credentials: { email: string; password: string }) {
-    const { email, password } = credentials;
-
-    const parent = await this.userModel
-      .findOne({ email, role: UserRole.PARENT })
-      .select('+password')
-      .lean();
-
-    if (!parent) {
-      this.logger.warn(`Parent login failed: No parent found with email ${email}`);
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, parent.password);
-    if (!isPasswordValid) {
-      this.logger.warn(`Parent login failed: Invalid password for ${email}`);
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const payload = {
-      sub: parent._id,
-      email: parent.email,
-      role: parent.role,
-      firstName: parent.firstName,
-      lastName: parent.lastName,
-      phoneNumber: parent.phoneNumber,
-      createdBy: parent.createdBy,
-    };
-
-    this.logger.log(`Parent ${parent.firstName} logged in successfully`);
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        _id: parent._id,
-        email: parent.email,
-        firstName: parent.firstName,
-        lastName: parent.lastName,
-        role: parent.role,
-        createdBy: parent.createdBy,
-      },
-    };
-  }
-
-  async mentorSelfRegister(
-    dto: RegisterMentorDto,
-    files?: { photo?: any; nationalId?: any },
-  ) {
-    const session: ClientSession = await this.mentorModel.db.startSession();
-    try {
-      let existing = await this.mentorModel.findOne({ email: dto.email });
-      if (existing) {
-        throw new ConflictException('Email already in use');
-      }
-
-      let imageUrl: string | undefined;
-      let nationalIdUrl: string | undefined;
-      if (files?.photo) {
-        imageUrl = await uploadToAzureStorage(files.photo);
-      }
-      if (files?.nationalId) {
-        nationalIdUrl = await uploadToAzureStorage(files.nationalId);
-      }
-
-      const hashedPassword = await bcrypt.hash(dto.password, 10);
-
-      let newMentor: any;
-      await session.withTransaction(async () => {
-        newMentor = new this.mentorModel({
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          specialty: dto.specialty,
-          email: dto.email,
-          phoneNumber: dto.phoneNumber,
-          city: dto.city,
-          country: dto.country,
-          image: imageUrl,
-          password: hashedPassword,
-          role: UserRole.MENTOR,
-          
-          biography: dto.biography,
-          
-          linkedin: dto.linkedin,
-          
-          nationalIdUrl: nationalIdUrl,
-        });
-        await newMentor.save({ session });
-      });
-
-      const payload = {
-        sub: newMentor._id,
-        email: newMentor.email,
-        role: newMentor.role,
-        name: newMentor.firstName,
-      };
-
-      return {
-        access_token: this.jwtService.sign(payload),
-        user: newMentor.toObject(),
-      };
-    } catch (error) {
-      this.logger.error('Error registering mentor', error);
-      throw error;
-    } finally {
-      await session.endSession();
-    }
   }
 }

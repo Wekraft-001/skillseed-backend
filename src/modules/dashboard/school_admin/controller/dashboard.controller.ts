@@ -9,6 +9,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { SchoolDashboardService } from '../services/index';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -21,7 +22,12 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from 'src/modules/schemas';
 import { Model } from 'mongoose';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ContentType,
+  FilterContentWithoutCategoryDto,
+} from 'src/modules/content/dtos';
+import { CurrentUser } from 'src/common/decorators';
 
 @Controller('school/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -68,7 +74,7 @@ export class SchoolDashboardController {
     );
   }
 
-  @Get('student')
+  @Get('students')
   @HttpCode(HttpStatus.OK)
   @Roles(UserRole.SCHOOL_ADMIN)
   async getStudent(@Request() req) {
@@ -80,5 +86,30 @@ export class SchoolDashboardController {
       this.logger.error(`Error fetching student for user: ${user._id}`, error);
       throw error;
     }
+  }
+
+  @Get('content')
+  @ApiOperation({ summary: 'Get content uploaded by admin for schools' })
+  @ApiQuery({ name: 'type', enum: ContentType, required: false })
+  @ApiQuery({ name: 'search', required: false })
+  async getContent(
+    @CurrentUser() user: User,
+    @Query() filterDto: FilterContentWithoutCategoryDto,
+  ) {
+    return this.schoolDashboardService.getContent((user as any)._id, filterDto);
+  }
+
+  @Get('resources')
+  @ApiOperation({ summary: 'Get resources for school admins' })
+  @ApiQuery({ name: 'type', enum: ContentType, required: false })
+  @ApiQuery({ name: 'search', required: false })
+  async getResources(
+    @CurrentUser() user: User,
+    @Query() filterDto: FilterContentWithoutCategoryDto,
+  ) {
+    return this.schoolDashboardService.getResources(
+      (user as any)._id,
+      filterDto,
+    );
   }
 }

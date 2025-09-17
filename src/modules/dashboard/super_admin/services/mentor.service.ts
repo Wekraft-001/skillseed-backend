@@ -4,9 +4,8 @@ import { Model, ClientSession, Types } from 'mongoose';
 import { Mentor } from 'src/modules/schemas';
 import { CreateMentorDto, UserRole } from 'src/common/interfaces';
 import { User } from 'src/modules/schemas';
-import { PasswordService } from '../../super_admin/services/password-service.service';
+import { PasswordService } from './password-service.service';
 import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
-import type { Express } from 'express';
 import { EmailService } from 'src/common/utils/mailing/email.service';
 
 @Injectable()
@@ -181,9 +180,11 @@ export class MentorOnboardingService {
 
       return mentor;
     } catch (error) {
-      this.logger.error(`Error reactivating mentor with ID: ${mentorId}`, error);
+      this.logger.error(
+        `Error reactivating mentor with ID: ${mentorId}`,
+        error,
+      );
       throw error;
     }
   }
-
 }

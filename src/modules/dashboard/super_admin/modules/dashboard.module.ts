@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
+  Category,
+  CategorySchema,
   EducationalContent,
   EducationalContentSchema,
 } from 'src/modules/schemas';
@@ -17,12 +19,8 @@ import { AiModule } from 'src/modules/ai/ai.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: EducationalContent.name, schema: EducationalContentSchema },
-      { name: Badge.name, schema: BadgeSchema },
-      { name: ProjectShowcase.name, schema: ProjectShowcaseSchema },
-      { name: CareerQuiz.name, schema: CareerQuizSchema },
-      { name: School.name, schema: SchoolSchema },
       { name: User.name, schema: UserSchema },
+      { name: Category.name, schema: CategorySchema },
     ]),
     LoggerModule,
     AiModule,
