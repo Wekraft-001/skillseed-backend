@@ -80,10 +80,9 @@ export class ContentService {
 
       // Validate if the category exists
       try {
-        const categoryExists =
-          await this.connection.models.ChallengeCategory.findById(
-            createChallengeDto.categoryId,
-          );
+        const categoryExists = await this.connection.models.Category.findById(
+          createChallengeDto.categoryId,
+        );
         if (!categoryExists) {
           throw new NotFoundException(
             `Challenge category with ID ${createChallengeDto.categoryId} not found`,

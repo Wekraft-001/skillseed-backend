@@ -49,19 +49,18 @@ export class MentorController {
     status: 201,
     description: 'Mentor onboarded successfully',
     type: Mentor,
-    isArray: false,
   })
   @ApiResponse({
     status: 400,
     description: 'Bad Request',
-    type: CreateMentorDto,
-    isArray: false,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Mentor with this email already exists',
   })
   @ApiResponse({
     status: 500,
     description: 'Internal Server Error',
-    type: CreateMentorDto,
-    isArray: false,
   })
   @ApiOperation({
     summary: 'Onboard a new mentor with admin user',
@@ -72,12 +71,21 @@ export class MentorController {
     @UploadedFile() image: Express.Multer.File,
     @Body() createMentorDto: CreateMentorDto,
     @CurrentUser() superAdmin: User,
-  ): Promise<Mentor> {
-    return this.mentorOnboardingService.onboardMentor(
-      createMentorDto,
-      superAdmin,
-      image,
-    );
+  ): Promise<{ message: string; mentor: Mentor }> {
+    try {
+      const mentor = await this.mentorOnboardingService.onboardMentor(
+        createMentorDto,
+        superAdmin,
+        image,
+      );
+
+      return {
+        message: 'Mentor onboarded successfully',
+        mentor,
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Get('/all')
@@ -233,7 +241,8 @@ export class MentorController {
   })
   @ApiOperation({
     summary: 'Reactivate a mentor',
-    description: 'This endpoint allows the super admin to reactivate a suspended mentor.',
+    description:
+      'This endpoint allows the super admin to reactivate a suspended mentor.',
   })
   async reactivateMentor(
     @CurrentUser() superAdmin: User,

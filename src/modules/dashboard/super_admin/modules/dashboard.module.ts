@@ -20,6 +20,11 @@ import { AiModule } from 'src/modules/ai/ai.module';
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
+      { name: EducationalContent.name, schema: EducationalContentSchema },
+      { name: Badge.name, schema: BadgeSchema },
+      { name: ProjectShowcase.name, schema: ProjectShowcaseSchema },
+      { name: CareerQuiz.name, schema: CareerQuizSchema },
+      { name: School.name, schema: SchoolSchema },
       { name: Category.name, schema: CategorySchema },
     ]),
     LoggerModule,

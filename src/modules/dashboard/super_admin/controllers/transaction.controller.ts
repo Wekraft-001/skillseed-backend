@@ -273,6 +273,7 @@ export class TransactionController {
       const result = await this.transactionService.renewSchoolTransaction({
         schoolId: dto.schoolId,
         amount: dto.amount,
+        currency: dto.currency,
         numberOfKids: dto.numberOfKids,
         paymentMethod: dto.paymentMethod,
         transactionType: dto.transactionType,

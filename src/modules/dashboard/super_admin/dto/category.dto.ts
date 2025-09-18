@@ -27,6 +27,15 @@ export class CreateCategoryDto {
   @IsString()
   @IsOptional()
   icon?: string;
+
+  @ApiProperty({
+    description: 'Colour theme for category',
+    example: 'Blue',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  colorTheme?: string;
 }
 
 export class UpdateCategoryDto {

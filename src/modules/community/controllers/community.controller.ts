@@ -1,14 +1,21 @@
-import { 
-  Body, 
-  Controller, 
+import {
+  Body,
+  Controller,
   Delete,
-  Get, 
-  Param, 
-  Post, 
-  Query, 
-  UseGuards 
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CommunityService } from '../services/community.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -17,7 +24,6 @@ import { CurrentUser } from 'src/common/decorators';
 import { User } from '../../schemas';
 import { CreateCommunityDto, FilterCommunityDto } from '../dtos';
 import { UserRole } from 'src/common/interfaces';
-import { AgeGroup, CommunityCategory } from '../../schemas/community.schema';
 import { SeedCommunitiesService } from '../commands/seed-communities.command';
 
 @Controller('communities')
@@ -25,45 +31,67 @@ import { SeedCommunitiesService } from '../commands/seed-communities.command';
 export class CommunityController {
   constructor(
     private readonly communityService: CommunityService,
-    private readonly seedService: SeedCommunitiesService
+    private readonly seedService: SeedCommunitiesService,
   ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create new community (Super Admin only)' })
-  @ApiBody({ 
+  @ApiBody({
     type: CreateCommunityDto,
-    description: 'Create a new community with name, description, age group, and optional category ID'
+    description:
+      'Create a new community with name, description, age group, and optional category ID',
   })
   @ApiResponse({ status: 201, description: 'Community successfully created' })
-  @ApiResponse({ status: 400, description: 'Bad request - invalid data or category not found' })
-  @ApiResponse({ status: 403, description: 'Forbidden - only super admins can create communities' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid data or category not found',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - only super admins can create communities',
+  })
   createCommunity(
     @CurrentUser() user: User,
     @Body() createCommunityDto: CreateCommunityDto,
   ) {
-    return this.communityService.createCommunity(createCommunityDto, (user as any)._id);
+    return this.communityService.createCommunity(
+      createCommunityDto,
+      (user as any)._id,
+    );
   }
 
-  @Get()
+  @Get('all')
   @ApiOperation({ summary: 'Get all communities (public)' })
-  @ApiQuery({ name: 'category', enum: CommunityCategory, required: false, description: 'Filter by legacy category (deprecated)' })
-  @ApiQuery({ name: 'categoryId', required: false, description: 'Filter by category ID' })
-  @ApiQuery({ name: 'ageGroup', enum: AgeGroup, required: false, description: 'Filter by age group' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by name or description' })
-  getAllCommunities(
-    @Query() filterDto: FilterCommunityDto,
-  ) {
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter by legacy category (deprecated)',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Filter by category ID',
+  })
+  @ApiQuery({
+    name: 'ageGroup',
+    required: false,
+    description: 'Filter by age group',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by name or description',
+  })
+  getAllCommunities(@Query() filterDto: FilterCommunityDto) {
     return this.communityService.getAllCommunities(filterDto);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get community details by ID (public)' })
   @ApiParam({ name: 'id', description: 'Community ID' })
-  getCommunityById(
-    @Param('id') id: string,
-  ) {
+  getCommunityById(@Param('id') id: string) {
     return this.communityService.getCommunityById(id);
   }
 
@@ -72,10 +100,7 @@ export class CommunityController {
   @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: 'Join a community (Students only)' })
   @ApiParam({ name: 'id', description: 'Community ID' })
-  joinCommunity(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ) {
+  joinCommunity(@CurrentUser() user: User, @Param('id') id: string) {
     return this.communityService.joinCommunity(id, (user as any)._id);
   }
 
@@ -84,10 +109,7 @@ export class CommunityController {
   @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: 'Leave a community (Students only)' })
   @ApiParam({ name: 'id', description: 'Community ID' })
-  leaveCommunity(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ) {
+  leaveCommunity(@CurrentUser() user: User, @Param('id') id: string) {
     return this.communityService.leaveCommunity(id, (user as any)._id);
   }
 
@@ -95,9 +117,7 @@ export class CommunityController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: 'Get communities the student has joined' })
-  getUserCommunities(
-    @CurrentUser() user: User,
-  ) {
+  getUserCommunities(@CurrentUser() user: User) {
     return this.communityService.getUserCommunities((user as any)._id);
   }
 
@@ -106,10 +126,7 @@ export class CommunityController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Deactivate a community (Super Admin only)' })
   @ApiParam({ name: 'id', description: 'Community ID' })
-  deactivateCommunity(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ) {
+  deactivateCommunity(@CurrentUser() user: User, @Param('id') id: string) {
     return this.communityService.deactivateCommunity(id, (user as any)._id);
   }
 

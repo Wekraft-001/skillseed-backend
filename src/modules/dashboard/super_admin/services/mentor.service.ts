@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ClientSession, Types } from 'mongoose';
 import { Mentor } from 'src/modules/schemas';
@@ -29,6 +29,18 @@ export class MentorOnboardingService {
     try {
       session.startTransaction();
 
+      // Check if mentor with email already exists
+      const exisitingMentor = await this.mentorModel
+        .findOne({
+          email: createMentorDto.email,
+          deletedAt: null,
+        })
+        .session(session);
+
+      if (exisitingMentor) {
+        throw new ConflictException('A mentor with this email already exists');
+      }
+
       // Generate and hash password
       const tempPassword = this.passwordService.generateRandomPassword();
       const hashedPassword =
@@ -41,7 +53,7 @@ export class MentorOnboardingService {
       }
 
       // Create mentor document with all available fields
-      const newMentor = new this.mentorModel({
+      const mentorData = {
         firstName: createMentorDto.firstName,
         lastName: createMentorDto.lastName,
         email: createMentorDto.email,
@@ -59,27 +71,37 @@ export class MentorOnboardingService {
         role: UserRole.MENTOR,
         password: hashedPassword,
         createdBy: superAdmin._id,
-      });
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
 
-      await newMentor.save({ session });
+      const newMentor = await new this.mentorModel(mentorData);
+      const savedMentor = await newMentor.save({ session });
 
       const populatedMentor = await this.mentorModel
-        .findById(newMentor._id)
+        .findById(savedMentor._id)
         .populate('createdBy superAdmin students')
+        .session(session)
+        .lean()
         .exec();
 
       await session.commitTransaction();
 
       // Send welcome email
       await this.emailService.sendMentorOnboardingEmail(
-        newMentor.firstName,
-        newMentor.email,
+        savedMentor.firstName,
+        savedMentor.email,
         tempPassword,
       );
 
       this.logger.log(
-        `Mentor onboarded: ${newMentor.firstName} ${newMentor.lastName} by ${superAdmin.email}`,
+        `Mentor onboarded: ${savedMentor.firstName} ${savedMentor.lastName} by ${superAdmin.email}`,
       );
+
+      if (!populatedMentor) {
+        return savedMentor.toObject();
+      }
 
       return populatedMentor;
     } catch (error) {

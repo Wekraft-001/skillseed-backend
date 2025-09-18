@@ -49,7 +49,7 @@ export class CreateChallengeDto {
   type: ChallengeType;
 
   @ApiProperty({
-    description: 'ID of the challenge category',
+    description: 'ID of the category',
     example: '507f1f77bcf86cd799439011',
   })
   @IsMongoId()

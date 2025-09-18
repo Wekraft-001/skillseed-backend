@@ -81,8 +81,9 @@ export class DashboardController {
     }
   }
 
-
   @Post('create-category')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new category (Super Admin only)' })
   @ApiBody({
     type: CreateCategoryDto,
@@ -101,8 +102,8 @@ export class DashboardController {
     status: 403,
     description: 'Forbidden resource, only super admins can access.',
   })
-  create(@Body() createDto: CreateCategoryDto, @CurrentUser() user: User) {
-    return this.dashboardService.create(createDto, (user as any)._id);
+  create(@Body() createDto: CreateCategoryDto) {
+    return this.dashboardService.create(createDto);
   }
 
   @Get('all-categories')
@@ -172,5 +173,23 @@ export class DashboardController {
   })
   remove(@Param('id') id: string, @CurrentUser() user: User) {
     return this.dashboardService.remove(id, (user as any)._id);
+  }
+
+  // USERS CONTROLLER
+  @ApiOperation({ summary: 'Get all users' })
+  @ApiResponse({ status: 200, description: 'All users retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: 'List of all users', type: [User] })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Users not found' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @Get('all-users')
+  async getAllUsers() {
+    return this.dashboardService.findAllUsers();
   }
 }

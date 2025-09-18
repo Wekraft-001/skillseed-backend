@@ -1,31 +1,51 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsMongoId, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { AgeGroup, CommunityCategory } from '../../schemas/community.schema';
+import {
+  IsEnum,
+  IsMongoId,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { Types } from 'mongoose';
 
 export class CreateCommunityDto {
-  @ApiProperty({ description: 'Name of the community', example: 'Tech & Coding Club' })
+  @ApiProperty({
+    description: 'Name of the community',
+    example: 'Tech & Coding Club',
+  })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'Description of the community', example: 'Join us to learn coding and explore technology in a fun way!' })
+  @ApiProperty({
+    description: 'Description of the community',
+    example: 'Join us to learn coding and explore technology in a fun way!',
+  })
   @IsString()
   @IsNotEmpty()
   description: string;
 
-  @ApiProperty({ enum: CommunityCategory, description: 'Legacy category of the community (deprecated)', example: CommunityCategory.TECH_CODING, required: false })
-  @IsEnum(CommunityCategory)
+  @ApiProperty({
+    description: 'Legacy category of the community (deprecated)',
+    example: 'Name of category',
+    required: false,
+  })
   @IsOptional()
-  category?: CommunityCategory;
+  category?: string;
 
-  @ApiProperty({ description: 'ID of the category for this community', example: '60d21b4667d0d8992e610c85', required: false })
+  @ApiProperty({
+    description: 'ID of the category for this community',
+    example: '60d21b4667d0d8992e610c85',
+    required: false,
+  })
   @IsMongoId()
   @IsOptional()
   categoryId?: string;
 
-  @ApiProperty({ enum: AgeGroup, description: 'Age group for this community', example: AgeGroup.AGE_9_TO_12 })
-  @IsEnum(AgeGroup)
+  @ApiProperty({
+    description: 'Age group for this community',
+    example: '9-12',
+  })
   @IsNotEmpty()
-  ageGroup: AgeGroup;
+  ageGroup: string;
 }

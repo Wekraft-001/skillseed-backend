@@ -103,25 +103,21 @@ export class CommunityService {
         query.ageGroup = filterDto.ageGroup;
       }
 
-      if (filterDto.categoryId) {
-        query.challengeCategory = new Types.ObjectId(filterDto.categoryId);
-      }
-
       if (filterDto.search) {
         query.$or = [
           { name: { $regex: filterDto.search, $options: 'i' } },
           { description: { $regex: filterDto.search, $options: 'i' } },
         ];
       }
-
+      console.log('Community query:', query);
       const communities = await this.communityModel
         .find(query)
-        .select(
-          'name description category challengeCategory ageGroup members createdAt',
-        )
-        .populate('challengeCategory', 'name icon description')
+        .select('name description category ageGroup members createdAt')
+        .populate('category', 'name icon description')
         .sort({ name: 1 })
         .exec();
+
+      console.log('Found communities:', communities);
 
       return communities.map((community) => ({
         ...community.toObject(),

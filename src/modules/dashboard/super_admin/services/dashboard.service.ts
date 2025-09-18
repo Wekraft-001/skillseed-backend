@@ -2,19 +2,30 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { DashboardResponse } from 'src/common/interfaces';
+import {
+  DashboardData,
+  DashboardResponse,
+  DashboardSummary,
+  UserRole,
+} from 'src/common/interfaces';
 import {
   User,
   Category,
   CategoryDocument,
   UserDocument,
+  Badge,
 } from '../../../schemas';
-import { UserRole } from 'src/common/interfaces';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto';
+import { EducationalContent } from '../../../schemas/educational_content.schema';
+import { ProjectShowcase } from '../../../schemas/showcase.schema';
+import { CareerQuiz } from '../../../schemas/career-quiz.schema';
+import { School } from '../../school_admin/schema/school.schema';
+import { AiService } from 'src/modules/ai/ai.service';
 
 @Injectable()
 export class DashboardService {
@@ -22,17 +33,66 @@ export class DashboardService {
     @InjectModel(Category.name)
     private categoryModel: Model<CategoryDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+
+    @InjectModel(EducationalContent.name)
+    private readonly eduContentModel: Model<EducationalContent>,
+
+    @InjectModel(Badge.name)
+    private readonly badgeModel: Model<Badge>,
+
+    @InjectModel(ProjectShowcase.name)
+    private readonly projectShowcaseModel: Model<ProjectShowcase>,
+
+    @InjectModel(CareerQuiz.name)
+    private readonly quizModel: Model<CareerQuiz>,
+
+    @InjectModel(School.name)
+    private readonly schoolModel: Model<School>,
+
+    private readonly aiService: AiService,
     private readonly logger: LoggerService,
   ) {}
 
   async getDashboardData(user: User): Promise<{
     dashboardResponse: DashboardResponse;
-    currentUser: User;
+    summary: DashboardSummary;
   }> {
     try {
       this.logger.log(
         `Fetching dashboard data for user: ${user._id} with role: ${user.role}`,
       );
+
+      const [data, summary] = await (() => {
+        switch (user.role) {
+          case UserRole.STUDENT:
+            return Promise.all([
+              this.getStudentDashboardData(user),
+              this.getStudentSummary(user),
+            ]);
+          case UserRole.MENTOR:
+            return Promise.all([
+              this.getMentorDashboardData(user),
+              this.getMentorSummary(user),
+            ]);
+          case UserRole.PARENT:
+            return Promise.all([
+              this.getParentDashboardData(user),
+              this.getParentSummary(user),
+            ]);
+          case UserRole.SCHOOL_ADMIN:
+            return Promise.all([
+              this.getSchoolAdminDashboardData(user),
+              this.getSchoolAdminSummary(user),
+            ]);
+          case UserRole.SUPER_ADMIN:
+            return Promise.all([
+              this.getSuperAdminDashboardData(user),
+              this.getSuperAdminSummary(user),
+            ]);
+          default:
+            throw new ForbiddenException('Invalid user role');
+        }
+      })();
 
       const dashboardResponse: DashboardResponse = {
         success: true,
@@ -45,7 +105,7 @@ export class DashboardService {
 
       return {
         dashboardResponse,
-        currentUser: user,
+        summary,
       };
     } catch (error) {
       this.logger.error(
@@ -55,21 +115,220 @@ export class DashboardService {
       throw error;
     }
   }
+  // ALL DASHBOARD DATA
+  private async getSuperAdminDashboardData(user: User): Promise<DashboardData> {
+    const [schools, students] = await Promise.all([
+      this.schoolModel
+        .find({ deletedAt: null })
+        .populate('superAdmin', 'firstName lastName email role')
+        .populate('createdBy', 'firstName lastName email role')
+        .lean(),
+      this.userModel
+        .find({
+          role: UserRole.STUDENT,
+          deletedAt: null,
+        })
+        .populate('school', 'schoolName email logoUrl')
+        .populate('createdBy', 'firstName lastName email role')
+        .lean(),
+    ]);
 
-  async create(createDto: CreateCategoryDto, userId: string) {
+    return {
+      schools,
+      student: students,
+      analytics: {
+        totalSchools: schools.length,
+        totalStudents: students.length,
+      },
+    };
+  }
+
+  private async getSuperAdminSummary(user: User): Promise<DashboardSummary> {
+    const schoolCount = await this.schoolModel.countDocuments();
+    const userCount = await this.userModel.countDocuments();
+    return {
+      totalSchools: schoolCount,
+      totalUsers: userCount,
+      // user: user as any,
+    };
+  }
+
+  private async getStudentDashboardData(user: User): Promise<DashboardData> {
+    const [educationalContents, badges] = await Promise.all([
+      this.getEducationalContents(user),
+      this.getStudentBadges(user),
+    ]);
+
+    return {
+      educationalContents,
+      badges,
+    };
+  }
+
+  private async getEducationalContents(
+    user: User,
+  ): Promise<EducationalContent[]> {
+    let content = await this.eduContentModel.find({ user: user._id });
+
+    if (!content.length) {
+      this.logger.log(
+        `No educational content found for user: ${user._id.toString()}. Generating.. please wait...`,
+      );
+
+      // Generate the content data
+      const newContentData = await this.aiService.generateEducationalContent(
+        user._id.toString(), // Convert ObjectId to string for the AI service
+      );
+
+      // Create and save the document using the model
+      const newContent = await this.eduContentModel.create({
+        ...newContentData,
+        user: user._id,
+      });
+
+      content = [newContent];
+    }
+
+    return content;
+  }
+
+  private async getStudentBadges(user: User): Promise<Badge[]> {
+    return this.badgeModel.find({ user: user._id }).sort({ createdAt: -1 });
+  }
+
+  private async getStudentSummary(user: User): Promise<DashboardSummary> {
+    const [badgeCount, completedQuizzes] = await Promise.all([
+      this.badgeModel.countDocuments({ user: user._id }),
+      this.quizModel.countDocuments({ user: user._id, completed: true }),
+    ]);
+    return {
+      totalBadges: badgeCount,
+      completedQuizzes,
+    };
+  }
+
+  private async getMentorDashboardData(user: User): Promise<DashboardData> {
+    return {
+      // success: true,
+      // message: 'Mentor dashboard data retrieved successfully',
+      // timestamp: new Date().toISOString(),
+      // userId: (user as any)._id,
+      student: [],
+      badges: [],
+      showcases: [],
+    };
+  }
+
+  private async getMentorSummary(user: User): Promise<DashboardSummary> {
+    return {
+      totalStudent: 0,
+      totalBadges: await this.badgeModel.countDocuments({ user: user._id }),
+      totalShowcases: await this.projectShowcaseModel.countDocuments({
+        user: user._id,
+      }),
+    };
+  }
+
+  private async getParentDashboardData(user: User): Promise<DashboardData> {
+    return {
+      // success: true,
+      // message: 'Parent dashboard data retrieved successfully',
+      // timestamp: new Date().toISOString(),
+      // userId: (user as any)._id,
+      student: [],
+      badges: [],
+      showcases: [],
+    };
+  }
+
+  private async getParentSummary(user: User): Promise<DashboardSummary> {
+    return {
+      totalStudent: 0,
+      totalBadges: 0,
+      totalShowcases: 0,
+    };
+  }
+
+  private async getSchoolAdminDashboardData(
+    user: User,
+  ): Promise<DashboardData> {
+    const [students] = await Promise.all([
+      this.userModel
+        .find({
+          role: UserRole.STUDENT,
+          createdBy: user._id,
+          deletedAt: null,
+        })
+        .populate('school', 'schoolName schoolContactPerson email logoUrl')
+        .populate('createdBy', 'firstName lastName email role')
+        .populate('quizzes')
+        .lean(),
+    ]);
+
+    return {
+      student: students,
+      showcases: [],
+      analytics: {
+        totalStudent: students.length,
+      },
+    };
+  }
+
+  private async getSchoolAdminSummary(user: User): Promise<DashboardSummary> {
+    return {
+      totalStudent: 0,
+      totalBadges: 0,
+      totalShowcases: 0,
+    };
+  }
+
+  // ENDPOINTS FOR CATEGORY
+  // CREATE CATEGORY
+  // async create(createDto: CreateCategoryDto, userId: string) {
+  //   try {
+  //     // Check if user is a super admin
+  //     const user = await this.userModel.findById(userId);
+  //     if (!user) {
+  //       throw new NotFoundException('User not found');
+  //     }
+
+  //     if (user.role !== UserRole.SUPER_ADMIN) {
+  //       throw new BadRequestException(
+  //         'Only super admins can create categories',
+  //       );
+  //     }
+
+  //     // Check if category with same name already exists
+  //     const existingCategory = await this.categoryModel.findOne({
+  //       name: createDto.name,
+  //     });
+  //     if (existingCategory) {
+  //       throw new BadRequestException(
+  //         `Category with name "${createDto.name}" already exists`,
+  //       );
+  //     }
+
+  //     const newCategory = new this.categoryModel({
+  //       ...createDto,
+  //       createdBy: new Types.ObjectId(userId),
+  //     });
+
+  //     const savedCategory = await newCategory.save();
+  //     this.logger.log(
+  //       `Category created: ${savedCategory._id} by user ${userId}`,
+  //     );
+
+  //     return savedCategory;
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `Error creating category: ${error.message}`,
+  //       error.stack,
+  //     );
+  //     throw error;
+  //   }
+  // }
+  async create(createDto: CreateCategoryDto) {
     try {
-      // Check if user is a super admin
-      const user = await this.userModel.findById(userId);
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      if (user.role !== UserRole.SUPER_ADMIN) {
-        throw new BadRequestException(
-          'Only super admins can create categories',
-        );
-      }
-
       // Check if category with same name already exists
       const existingCategory = await this.categoryModel.findOne({
         name: createDto.name,
@@ -82,13 +341,11 @@ export class DashboardService {
 
       const newCategory = new this.categoryModel({
         ...createDto,
-        createdBy: new Types.ObjectId(userId),
+        // Remove the createdBy field or make it optional
       });
 
       const savedCategory = await newCategory.save();
-      this.logger.log(
-        `Category created: ${savedCategory._id} by user ${userId}`,
-      );
+      this.logger.log(`Category created: ${savedCategory._id}`);
 
       return savedCategory;
     } catch (error) {
@@ -100,6 +357,7 @@ export class DashboardService {
     }
   }
 
+  // GET CATEGORIES
   async findAll() {
     try {
       return this.categoryModel.find().sort({ name: 1 }).exec();
@@ -112,6 +370,7 @@ export class DashboardService {
     }
   }
 
+  // GET CATEGORY BY ID
   async findOne(id: string) {
     try {
       const category = await this.categoryModel.findById(id).exec();
@@ -128,6 +387,7 @@ export class DashboardService {
     }
   }
 
+  // EDIT CATEGORY
   async update(id: string, updateDto: UpdateCategoryDto, userId: string) {
     try {
       // Check if user is a super admin
@@ -180,6 +440,7 @@ export class DashboardService {
     }
   }
 
+  // DELETE CATEGORY
   async remove(id: string, userId: string) {
     try {
       // Check if user is a super admin
@@ -216,5 +477,21 @@ export class DashboardService {
       );
       throw error;
     }
+  }
+
+  // USERS SERVICES
+  async findAllUsers(): Promise<User[]> {
+    return this.userModel
+      .find({ deletedAt: null })
+      .populate('school')
+      .populate('createdBy')
+      .populate('subscription')
+      .lean()
+      .exec();
+  }
+
+  async findById(userId: string | Types.ObjectId) {
+    if (!userId) return null;
+    return this.userModel.findById(userId).lean().exec();
   }
 }

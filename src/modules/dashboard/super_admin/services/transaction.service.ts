@@ -119,6 +119,7 @@ export class TransactionService {
       const newTransaction = new this.transactionModel({
         schoolName: createTransactionDto.schoolName,
         amount: createTransactionDto.amount,
+        currency: createTransactionDto.currency,
         paymentMethod: createTransactionDto.paymentMethod,
         numberOfKids: createTransactionDto.numberOfKids,
         transactionType: createTransactionDto.transactionType,
@@ -237,6 +238,7 @@ export class TransactionService {
   async renewSchoolTransaction(dto: {
     schoolId: string;
     amount: number;
+    currency: string;
     numberOfKids: number;
     paymentMethod: string;
     transactionType?: string;
@@ -255,6 +257,7 @@ export class TransactionService {
       const newTransaction = new this.transactionModel({
         schoolName: school.schoolName,
         amount: dto.amount,
+        currency: dto.currency,
         paymentMethod: dto.paymentMethod,
         numberOfKids: dto.numberOfKids,
         transactionType: dto.transactionType || transactionType.SUBSCRIPTION,

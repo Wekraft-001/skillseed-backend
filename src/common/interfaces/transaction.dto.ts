@@ -1,26 +1,29 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
-import { PaymentMethod } from "./payment-methods-interface.enum";
-import { transactionType } from "./transaction-type.enum";
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { PaymentMethod } from './payment-methods-interface.enum';
+import { transactionType } from './transaction-type.enum';
 
 export class CreateTransactionDto {
-    @IsString()
-    schoolName: string;
+  @IsString()
+  schoolName: string;
 
-    @IsNumber()
-    @Min(0)
-    amount: number;
+  @IsNumber()
+  @Min(0)
+  amount: number;
 
-    @IsNumber()
-    @Min(1)
-    numberOfKids: number;
+  @IsString()
+  currency: string;
 
-    @IsEnum(PaymentMethod)
-    paymentMethod: string;
+  @IsNumber()
+  @Min(1)
+  numberOfKids: number;
 
-    @IsEnum(transactionType)
-    transactionType: transactionType;
+  @IsEnum(PaymentMethod)
+  paymentMethod: string;
 
-    @IsString()
-    @IsOptional()
-    notes: string;
+  @IsEnum(transactionType)
+  transactionType: transactionType;
+
+  @IsString()
+  @IsOptional()
+  notes: string;
 }

@@ -21,6 +21,7 @@ import { JwtService } from '@nestjs/jwt';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { ParentDashboardService } from '../dashboard/parents/services/dashboard.service';
 import { AuthTokenResponseDto } from 'src/common/interfaces';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('auth')
 @ApiTags('AUTH')
@@ -93,6 +94,23 @@ export class AuthController {
   })
   sigin(@Body() body: LoginDto) {
     return this.authService.login(body);
+  }
+
+  @Get('profile')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({
+    summary: 'Get profile for super admin or parent',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getProfile(@CurrentUser() user: User) {
+    return this.authService.getProfile(user._id.toString());
   }
 
   @Post('school/signin')

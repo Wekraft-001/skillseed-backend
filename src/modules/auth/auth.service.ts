@@ -105,6 +105,19 @@ export class AuthService {
     };
   }
 
+  async getProfile(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('-password')
+      .lean();
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return user;
+  }
+
   async childLogin(credentials: { firstName: string; password: string }) {
     const childUser = await this.userModel
       .findOne({ firstName: credentials.firstName })
