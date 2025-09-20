@@ -137,7 +137,7 @@ export class CommunityService {
       const community = await this.communityModel
         .findById(communityId)
         .populate('members', 'firstName lastName image')
-        .populate('challengeCategory', 'name icon description')
+        .populate('category', 'name icon description')
         .exec();
 
       if (!community) {
