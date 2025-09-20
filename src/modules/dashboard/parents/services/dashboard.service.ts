@@ -190,173 +190,194 @@ export class ParentDashboardService {
   }
 
   async registerFinalStudent(tempStudentData: TempStudentDataDto, user: User) {
-    const session = await this.userModel.db.startSession();
-    session.startTransaction();
+    const MAX_RETRIES = 3;
+    let attempt = 0;
 
-    try {
-      this.logger.log(
-        `Finalizing registration for childTempId: ${tempStudentData.childTempId}, user: ${user._id}`,
-      );
+    while (attempt < MAX_RETRIES) {
+      const session = await this.userModel.db.startSession();
+      session.startTransaction();
 
-      // STEP 1: Atomically claim the subscription
-      const subscription = await this.subscriptionModel.findOneAndUpdate(
-        {
-          user: user._id,
-          childTempId: tempStudentData.childTempId,
-          paymentStatus: PaymentStatus.COMPLETED,
-          isActive: true,
-          endDate: { $gte: new Date() },
-          child: null, // only claim if not already linked
-        },
-        { $set: { updatedAt: new Date() } },
-        { new: true, session },
-      );
+      try {
+        this.logger.log(
+          `Attempt ${attempt + 1}: Finalizing registration for childTempId: ${tempStudentData.childTempId}, user: ${user._id}`,
+        );
 
-      if (!subscription) {
-        // Maybe already claimed → return existing student if available
-        const existingSub = await this.subscriptionModel
-          .findOne({
+        // STEP 1: Atomically claim the subscription
+        const subscription = await this.subscriptionModel.findOneAndUpdate(
+          {
             user: user._id,
             childTempId: tempStudentData.childTempId,
-          })
-          .populate('child');
+            paymentStatus: PaymentStatus.COMPLETED,
+            isActive: true,
+            endDate: { $gte: new Date() },
+            child: null,
+          },
+          { $set: { updatedAt: new Date() } },
+          { new: true, session },
+        );
 
-        if (existingSub?.child) {
-          this.logger.log(
-            `Idempotent hit: returning existing student for subscription ${existingSub._id}`,
+        if (!subscription) {
+          const existingSub = await this.subscriptionModel
+            .findOne({
+              user: user._id,
+              childTempId: tempStudentData.childTempId,
+            })
+            .populate('child');
+
+          if (existingSub?.child) {
+            this.logger.log(
+              `Idempotent hit: returning existing student for subscription ${existingSub._id}`,
+            );
+            await session.abortTransaction();
+            session.endSession();
+            return await this.userModel
+              .findById(existingSub.child)
+              .populate('subscription')
+              .lean();
+          }
+
+          throw new BadRequestException(
+            'No valid subscription found for this student registration',
           );
+        }
+
+        // STEP 2: Idempotency check
+        const existingStudent = await this.userModel.findOne({
+          subscription: subscription._id,
+          parent: user._id,
+        });
+
+        if (existingStudent) {
+          this.logger.log(
+            `Idempotent hit: Student ${existingStudent._id} already linked to subscription ${subscription._id}`,
+          );
+          await session.abortTransaction();
+          session.endSession();
           return await this.userModel
-            .findById(existingSub.child)
+            .findById(existingStudent._id)
             .populate('subscription')
             .lean();
         }
 
-        throw new BadRequestException(
-          'No valid subscription found for this student registration',
-        );
-      }
+        // STEP 3: Create permanent student record
+        const student = new this.userModel({
+          firstName: tempStudentData.firstName,
+          lastName: tempStudentData.lastName,
+          grade: tempStudentData.grade,
+          age: tempStudentData.age,
+          password: tempStudentData.password,
+          plainPassword: tempStudentData.plainPassword,
+          role: UserRole.STUDENT,
+          image: tempStudentData.imageUrl,
+          parent: user._id,
+          subscription: subscription._id,
+          createdBy: subscription.user,
+        });
+        await student.save({ session });
 
-      // STEP 2: Idempotency check — does a student already exist for this subscription?
-      const existingStudent = await this.userModel.findOne({
-        subscription: subscription._id,
-        parent: user._id,
-      });
-
-      if (existingStudent) {
+        // STEP 4: Link student to subscription
+        subscription.child = new Types.ObjectId(student._id as string);
+        await subscription.save({ session });
         this.logger.log(
-          `Idempotent hit: Student ${existingStudent._id} already linked to subscription ${subscription._id}`,
+          `Linked student ${student._id} to subscription ${subscription._id}`,
         );
-        await session.abortTransaction();
+
+        // STEP 5: Generate initial quiz (best-effort)
+        try {
+          const ageRange = this.calculateAgeRange(student.age);
+          const quiz = await this.aiService.generateCareerQuizForUserId(
+            student._id,
+            ageRange,
+          );
+          student.initialQuizId = quiz._id;
+          await student.save({ session });
+          this.logger.log(
+            `Generated initial career quiz ${quiz._id} for student ${student._id}`,
+          );
+        } catch (quizError) {
+          this.logger.error(
+            `Failed to generate quiz for student ${student._id}: ${quizError.message}`,
+          );
+        }
+
+        // STEP 6: Ensure transaction record is unique
+        const existingTransaction = await this.transactionModel.findOne({
+          transactionType: transactionType.STUDENT_REGISTRATION,
+          parent: user._id,
+          $or: [
+            { student: student._id },
+            { transactionRef: subscription.transactionRef },
+          ],
+        });
+
+        if (!existingTransaction) {
+          const transaction = new this.transactionModel({
+            amount: subscription.amount,
+            currency: subscription.currency,
+            paymentMethod: subscription.payment_options,
+            transactionType: transactionType.STUDENT_REGISTRATION,
+            transactionDate: new Date(),
+            parent: user._id,
+            student: student._id,
+            notes: `Student registration for ${student.firstName} ${student.lastName}`,
+            transactionRef:
+              subscription.flutterwaveTransactionId ||
+              subscription.transactionRef,
+          });
+          await transaction.save({ session });
+          this.logger.log(`Created transaction ${transaction._id}`);
+        } else {
+          this.logger.log(
+            `Transaction already exists for subscription ${subscription._id}`,
+          );
+        }
+
+        await session.commitTransaction();
         session.endSession();
+
+        this.logger.log(`✅ Student registered successfully: ${student._id}`);
+
+        // STEP 7: Send onboarding email (outside of transaction)
+        try {
+          await this.emailService.sendStudentOnboardingEmail(
+            user.email,
+            `${student.firstName} ${student.lastName}`,
+            tempStudentData.plainPassword,
+            `${student.firstName}`,
+            'https://student.wekraft.co',
+          );
+          this.logger.log(`Sent onboarding email to parent: ${user.email}`);
+        } catch (emailError) {
+          this.logger.error(
+            `Failed to send onboarding email: ${emailError.message}`,
+          );
+        }
+
         return await this.userModel
-          .findById(existingStudent._id)
+          .findById(student._id)
           .populate('subscription')
           .lean();
+      } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+
+        if (error.code === 112 || error.message.includes('WriteConflict')) {
+          attempt++;
+          this.logger.warn(
+            `⚠️ WriteConflict detected (attempt ${attempt}). Retrying...`,
+          );
+          await new Promise((res) => setTimeout(res, 200));
+          continue;
+        }
+
+        this.logger.error(`❌ Error in registerFinalStudent: ${error.message}`);
+        throw error;
       }
-
-      // STEP 3: Create permanent student record
-      const student = new this.userModel({
-        firstName: tempStudentData.firstName,
-        lastName: tempStudentData.lastName,
-        grade: tempStudentData.grade,
-        age: tempStudentData.age,
-        password: tempStudentData.password,
-        plainPassword: tempStudentData.plainPassword,
-        role: UserRole.STUDENT,
-        image: tempStudentData.imageUrl,
-        parent: user._id,
-        subscription: subscription._id,
-        createdBy: subscription.user,
-      });
-      await student.save({ session });
-
-      // STEP 4: Link student to subscription
-      // subscription.child = new Types.ObjectId(student._id);
-      await subscription.save({ session });
-      this.logger.log(
-        `Linked student ${student._id} to subscription ${subscription._id}`,
-      );
-
-      // STEP 5: Generate initial quiz (best-effort, non-blocking)
-      try {
-        const ageRange = this.calculateAgeRange(student.age);
-        const quiz = await this.aiService.generateCareerQuizForUserId(
-          student._id,
-          ageRange,
-        );
-        student.initialQuizId = quiz._id;
-        await student.save({ session });
-        this.logger.log(
-          `Generated initial career quiz ${quiz._id} for student ${student._id}`,
-        );
-      } catch (quizError) {
-        this.logger.error(
-          `Failed to generate quiz for student ${student._id}: ${quizError.message}`,
-        );
-      }
-
-      // STEP 6: Ensure transaction record is unique (idempotency)
-      const existingTransaction = await this.transactionModel.findOne({
-        transactionType: transactionType.STUDENT_REGISTRATION,
-        parent: user._id,
-        $or: [
-          { student: student._id },
-          { transactionRef: subscription.transactionRef },
-        ],
-      });
-
-      if (!existingTransaction) {
-        const transaction = new this.transactionModel({
-          amount: subscription.amount,
-          paymentMethod: subscription.payment_options,
-          transactionType: transactionType.STUDENT_REGISTRATION,
-          transactionDate: new Date(),
-          parent: user._id,
-          student: student._id,
-          notes: `Student registration for ${student.firstName} ${student.lastName}`,
-          transactionRef:
-            subscription.flutterwaveTransactionId ||
-            subscription.transactionRef,
-        });
-        await transaction.save({ session });
-        this.logger.log(`Created transaction ${transaction._id}`);
-      } else {
-        this.logger.log(
-          `Transaction already exists for subscription ${subscription._id}`,
-        );
-      }
-
-      await session.commitTransaction();
-      session.endSession();
-
-      this.logger.log(`✅ Student registered successfully: ${student._id}`);
-
-      // STEP 7: Send onboarding email (outside of transaction)
-      try {
-        await this.emailService.sendStudentOnboardingEmail(
-          user.email,
-          `${student.firstName} ${student.lastName}`,
-          tempStudentData.plainPassword,
-          `${student.firstName}`,
-          'https://student.wekraft.co',
-        );
-        this.logger.log(`Sent onboarding email to parent: ${user.email}`);
-      } catch (emailError) {
-        this.logger.error(
-          `Failed to send onboarding email: ${emailError.message}`,
-        );
-      }
-
-      return await this.userModel
-        .findById(student._id)
-        .populate('subscription')
-        .lean();
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      this.logger.error(`❌ Error in registerFinalStudent: ${error.message}`);
-      throw error;
     }
+
+    throw new Error(
+      `Failed to finalize student registration after ${MAX_RETRIES} attempts.`,
+    );
   }
 
   async getStudentForUser(user: User) {
@@ -379,10 +400,11 @@ export class ParentDashboardService {
         .find({ user: user._id })
         .populate({
           path: 'child', // reference to student
-          model: this.userModel,
-          select: 'firstName lastName age grade image role', // only needed fields
+          // model: this.userModel,
+          model: 'User',
+          select: 'firstName lastName age grade image role',
         })
-        .lean();
+        .exec();
 
       return {
         success: true,

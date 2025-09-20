@@ -17,10 +17,6 @@ import {
   Transaction,
   TransactionSchema,
 } from 'src/modules/schemas/transaction.schema';
-import { ParentLearningActivitiesController } from '../controllers/learning-activities.controller';
-import { ParentLearningActivitiesService } from '../services/learning-activities.service';
-import { ParentResourcesController } from '../controllers/resources.controller';
-import { ParentResourcesService } from '../services/resources.service';
 import { ContentModule } from 'src/modules/content/content.module';
 import { EmailModule } from 'src/common/utils/mailing/email.module';
 
@@ -40,16 +36,8 @@ import { EmailModule } from 'src/common/utils/mailing/email.module';
     ContentModule,
     EmailModule,
   ],
-  controllers: [
-    ParentDashboardController,
-    ParentLearningActivitiesController,
-    ParentResourcesController,
-  ],
-  providers: [
-    ParentDashboardService,
-    ParentLearningActivitiesService,
-    ParentResourcesService,
-  ],
+  controllers: [ParentDashboardController],
+  providers: [ParentDashboardService],
   exports: [ParentDashboardService],
 })
 export class ParentDashboardModule {}
