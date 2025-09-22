@@ -22,6 +22,8 @@ export class StudentDashboardService {
   async getDashboardData(student: User): Promise<{
     dashboardResponse: DashboardResponse;
   }> {
+    const completeUserData = await this.userModel.findById(student._id).exec();
+
     const [initialQuiz, recommendations] = await Promise.all([
       this.getInitialQuiz(student),
       this.getRecommendations(student),
@@ -35,7 +37,7 @@ export class StudentDashboardService {
         userId: student._id.toString(),
         quizzes: initialQuiz ? [initialQuiz] : [],
         educationalContents: recommendations || [],
-        currentUser: student,
+        currentUser: completeUserData || student,
       },
     };
   }
@@ -49,7 +51,9 @@ export class StudentDashboardService {
     // Get the quiz details
     const quiz = await this.quizModel.findById(student.initialQuizId);
     if (!quiz) {
-      this.logger.warn(`Initial quiz ${student.initialQuizId} not found for student ${student._id}`);
+      this.logger.warn(
+        `Initial quiz ${student.initialQuizId} not found for student ${student._id}`,
+      );
       return null;
     }
 
@@ -57,9 +61,9 @@ export class StudentDashboardService {
   }
 
   async submitQuizAnswers(
-    student: User, 
-    quizId: string, 
-    answers: { phaseIndex: number; questionIndex: number; answer: string }[]
+    student: User,
+    quizId: string,
+    answers: { phaseIndex: number; questionIndex: number; answer: string }[],
   ) {
     // Use AI service to submit and analyze answers
     const result = await this.aiService.submitAnswers(
@@ -86,7 +90,9 @@ export class StudentDashboardService {
         user: student._id,
       });
     } catch (error) {
-      this.logger.warn(`Unable to generate recommendations for student ${student._id}: ${error.message}`);
+      this.logger.warn(
+        `Unable to generate recommendations for student ${student._id}: ${error.message}`,
+      );
       // Return null to indicate no recommendations could be generated
       return null;
     }
@@ -107,7 +113,9 @@ export class StudentDashboardService {
     return content;
   }
 
-  async getEducationalContent(contentId: string): Promise<EducationalContent | null> {
+  async getEducationalContent(
+    contentId: string,
+  ): Promise<EducationalContent | null> {
     return this.eduContentModel.findById(contentId).exec();
   }
 }
