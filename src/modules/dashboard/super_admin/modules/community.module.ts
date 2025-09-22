@@ -8,10 +8,10 @@ import {
   CommunitySchema,
   User,
   UserSchema,
-} from '../schemas';
-import { CommunityController } from './controllers/community.controller';
-import { CommunityService } from './services/community.service';
-import { SeedCommunitiesService } from './commands/seed-communities.command';
+} from '../../../schemas';
+import { CommunityController } from '../controllers/community.controller';
+import { CommunityService } from '../services/community.service';
+// import { SeedCommunitiesService } from './commands/seed-communities.command';
 
 @Module({
   imports: [
@@ -23,7 +23,7 @@ import { SeedCommunitiesService } from './commands/seed-communities.command';
     LoggerModule,
   ],
   controllers: [CommunityController],
-  providers: [CommunityService, SeedCommunitiesService],
-  exports: [CommunityService, SeedCommunitiesService],
+  providers: [CommunityService],
+  exports: [CommunityService],
 })
 export class CommunityModule {}

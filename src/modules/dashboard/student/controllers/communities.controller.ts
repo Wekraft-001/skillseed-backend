@@ -6,7 +6,6 @@ import { UserRole } from 'src/common/interfaces';
 import { CurrentUser } from 'src/common/decorators';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { StudentCommunitiesService } from '../services/communities.service';
-import { FilterCommunityDto } from 'src/modules/community/dtos';
 import { User } from 'src/modules/schemas';
 
 @Controller('student/dashboard/communities')
@@ -38,15 +37,15 @@ export class StudentCommunitiesController {
     required: false,
     description: 'Search by name or description',
   })
-  async getAllCommunities(@Query() filterDto: FilterCommunityDto) {
-    return this.communitiesService.getAllCommunities(filterDto);
+  async getAllCommunities() {
+    return this.communitiesService.getCommunities();
   }
 
-  @Get('joined')
-  @ApiOperation({ summary: 'Get communities the student has joined' })
-  async getUserCommunities(@CurrentUser() user: User) {
-    return this.communitiesService.getUserCommunities((user as any)._id);
-  }
+  // @Get('joined')
+  // @ApiOperation({ summary: 'Get communities the student has joined' })
+  // async getUserCommunities(@CurrentUser() user: User) {
+  //   return this.communitiesService.getUserCommunities((user as any)._id);
+  // }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get community details by ID' })

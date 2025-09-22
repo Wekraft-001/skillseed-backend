@@ -20,6 +20,7 @@ import {
   SchoolModule,
   TransactionModule,
   MentorModule,
+  CommunityModule,
 } from './modules/dashboard/super_admin/modules/index';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SubscriptionModule } from './subscription/subscription.module';
@@ -30,7 +31,6 @@ import { ParentDashboardModule } from './modules/dashboard/parents/module/dashbo
 import { MentorDashboardModule } from './modules/dashboard/mentors/module/dashboard.module';
 import { StudentDashboardModule } from './modules/dashboard/student/module/dashboard.module';
 import { ContentModule } from './modules/content/content.module';
-import { CommunityModule } from './modules/community/community.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import { ReportsModule } from './modules/reports/reports.module';
 
@@ -59,6 +59,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     AiModule,
     SchoolModule,
     MentorModule,
+    CommunityModule,
     SchoolDashboardModule,
     ParentDashboardModule,
     MentorDashboardModule,
@@ -69,7 +70,6 @@ import { ReportsModule } from './modules/reports/reports.module';
     TransactionModule,
     PaymentModule,
     ContentModule,
-    CommunityModule,
     RewardsModule,
     ReportsModule,
     ScheduleModule.forRoot(),

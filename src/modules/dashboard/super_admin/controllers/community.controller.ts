@@ -17,21 +17,21 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CommunityService } from '../services/community.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators';
-import { User } from '../../schemas';
-import { CreateCommunityDto, FilterCommunityDto } from '../dtos';
+import { User } from '../../../schemas';
+import { CreateCommunityDto, FilterCommunityDto } from '../dto/community.dto';
 import { UserRole } from 'src/common/interfaces';
-import { SeedCommunitiesService } from '../commands/seed-communities.command';
+// import { SeedCommunitiesService } from '../commands/seed-communities.command';
 
 @Controller('communities')
-@ApiTags('COMMUNITY MANAGEMENT')
+@ApiTags('SUPERADMIN DASHBOARD')
 export class CommunityController {
   constructor(
     private readonly communityService: CommunityService,
-    private readonly seedService: SeedCommunitiesService,
+    // private readonly seedService: SeedCommunitiesService,
   ) {}
 
   @Post()
@@ -63,7 +63,7 @@ export class CommunityController {
   }
 
   @Get('all')
-  @ApiOperation({ summary: 'Get all communities (public)' })
+  @ApiOperation({ summary: 'Get all communities' })
   @ApiQuery({
     name: 'category',
     required: false,
@@ -89,28 +89,10 @@ export class CommunityController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get community details by ID (public)' })
+  @ApiOperation({ summary: 'Get community details by ID' })
   @ApiParam({ name: 'id', description: 'Community ID' })
   getCommunityById(@Param('id') id: string) {
     return this.communityService.getCommunityById(id);
-  }
-
-  @Post(':id/join')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.STUDENT)
-  @ApiOperation({ summary: 'Join a community (Students only)' })
-  @ApiParam({ name: 'id', description: 'Community ID' })
-  joinCommunity(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.communityService.joinCommunity(id, (user as any)._id);
-  }
-
-  @Post(':id/leave')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.STUDENT)
-  @ApiOperation({ summary: 'Leave a community (Students only)' })
-  @ApiParam({ name: 'id', description: 'Community ID' })
-  leaveCommunity(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.communityService.leaveCommunity(id, (user as any)._id);
   }
 
   @Get('user/joined')
@@ -124,18 +106,18 @@ export class CommunityController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Deactivate a community (Super Admin only)' })
+  @ApiOperation({ summary: 'Deactivate a community' })
   @ApiParam({ name: 'id', description: 'Community ID' })
   deactivateCommunity(@CurrentUser() user: User, @Param('id') id: string) {
     return this.communityService.deactivateCommunity(id, (user as any)._id);
   }
 
-  @Post('seed')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Seed initial communities (Super Admin only)' })
-  async seedCommunities() {
-    await this.seedService.seed();
-    return { message: 'Communities seeded successfully' };
-  }
+  // @Post('seed')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles(UserRole.SUPER_ADMIN)
+  // @ApiOperation({ summary: 'Seed initial communities (Super Admin only)' })
+  // async seedCommunities() {
+  //   await this.seedService.seed();
+  //   return { message: 'Communities seeded successfully' };
+  // }
 }
