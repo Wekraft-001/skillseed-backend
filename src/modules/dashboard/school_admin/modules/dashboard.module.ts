@@ -5,6 +5,7 @@ import { SchoolDashboardController } from '../controller/dashboard.controller';
 import { School, SchoolSchema, User, UserSchema } from '../../../schemas/index';
 import { LoggerModule } from 'src/common/logger/logger.module';
 import { ContentModule } from 'src/modules/content/content.module';
+import { EmailModule } from 'src/common/utils/mailing/email.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ContentModule } from 'src/modules/content/content.module';
     ]),
     LoggerModule,
     ContentModule,
+    EmailModule,
   ],
   controllers: [SchoolDashboardController],
   providers: [SchoolDashboardService],

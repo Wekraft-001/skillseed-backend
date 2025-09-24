@@ -339,7 +339,7 @@ export class ParentDashboardService {
 
         // STEP 7: Send onboarding email (outside of transaction)
         try {
-          await this.emailService.sendStudentOnboardingEmail(
+          await this.emailService.sendStudentOnboardingEmailParent(
             user.email,
             `${student.firstName} ${student.lastName}`,
             tempStudentData.plainPassword,

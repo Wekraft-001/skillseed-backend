@@ -16,6 +16,7 @@ import {
   FilterContentDto,
   FilterContentWithoutCategoryDto,
 } from 'src/modules/content/dtos';
+import { EmailService } from 'src/common/utils/mailing/email.service';
 
 @Injectable()
 export class SchoolDashboardService {
@@ -29,6 +30,8 @@ export class SchoolDashboardService {
     private readonly contentService: ContentService,
 
     private readonly logger: LoggerService,
+
+    private emailService: EmailService,
   ) {}
 
   async getSchoolProfile(schoolId: string): Promise<School> {
@@ -79,29 +82,6 @@ export class SchoolDashboardService {
     } catch (error) {
       this.logger.error(
         `Error fetching dashboard data for user: ${user._id}`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  async getMyProfile(schoolId: string): Promise<School> {
-    try {
-      this.logger.log(`Fetching mentor profile for mentor: ${schoolId}`);
-
-      const school = await this.schoolModel
-        .findById(schoolId)
-        // .populate('createdBy')
-        .lean();
-
-      if (!school) {
-        throw new BadRequestException('Mentor not found.');
-      }
-
-      return school;
-    } catch (error) {
-      this.logger.error(
-        `Error fetching mentor profile for mentor: ${schoolId}`,
         error,
       );
       throw error;
@@ -172,6 +152,26 @@ export class SchoolDashboardService {
       await session.commitTransaction();
       committed = true;
 
+      const dashboardUrl = 'https://student.wekraft.co';
+
+      try {
+        // Send both emails in parallel for better performance
+        (await this.emailService.sendStudentOnboardingEmailSchool(
+          createStudentDto.parentEmail,
+          currentUser.email,
+          createStudentDto.firstName,
+          createStudentDto.firstName,
+          createStudentDto.plainPassword,
+          dashboardUrl,
+        ),
+          this.logger.log(
+            `Emails sent successfully for student registration: ${newStudent._id}`,
+          ));
+      } catch (emailError) {
+        // Log email error but don't fail the registration
+        this.logger.error('Failed to send registration emails:', emailError);
+      }
+
       return await this.userModel
         .findById(newStudent._id)
         .populate('createdBy');
@@ -184,18 +184,6 @@ export class SchoolDashboardService {
       session.endSession();
     }
   }
-
-  // async getStudentsForUser(user: User) {
-  //   const query: any = { role: UserRole.STUDENT };
-
-  //   if (user.role === UserRole.SCHOOL_ADMIN && user.school) {
-  //     query.school = user.school;
-  //   } else if (user.role === UserRole.PARENT) {
-  //     query.createdBy = user._id;
-  //   }
-
-  //   return this.userModel.find(query).populate('createdBy').lean();
-  // }
 
   async getStudentForUser(user: User) {
     const query: any = { role: UserRole.STUDENT };
@@ -268,26 +256,5 @@ export class SchoolDashboardService {
     await this.userModel.deleteOne({ _id: student._id });
 
     return { success: true, message: 'Student deleted successfully' };
-  }
-
-  // CONTENT FOR SCHOOL DASHBOARD
-  async getContent(userId: string, filterDto: FilterContentWithoutCategoryDto) {
-    const fullFilterDto: FilterContentDto = {
-      ...filterDto,
-    };
-    return this.contentService.getContentForUser(userId, fullFilterDto);
-  }
-
-  async getResources(
-    userId: string,
-    filterDto: FilterContentWithoutCategoryDto,
-  ) {
-    // Convert to standard filter DTO but without category
-    const standardFilterDto: FilterContentDto = {
-      type: filterDto.type,
-      search: filterDto.search,
-    };
-
-    return this.contentService.getContentForUser(userId, standardFilterDto);
   }
 }

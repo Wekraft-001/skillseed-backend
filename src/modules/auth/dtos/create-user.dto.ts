@@ -82,6 +82,9 @@ export class CreateStudentDto {
   @IsOptional()
   @IsString()
   childTempId?: string;
+
+  @IsString()
+  plainPassword?: string;
 }
 
 export class TempStudentDataDto {

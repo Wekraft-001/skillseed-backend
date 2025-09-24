@@ -89,7 +89,7 @@ export class EmailService {
     }
   }
 
-  async sendStudentOnboardingEmail(
+  async sendStudentOnboardingEmailParent(
     parentEmail: string,
     studentName: string,
     password: string,
@@ -99,6 +99,46 @@ export class EmailService {
     const mailOptions = {
       from: process.env.MAIL_FROM,
       to: parentEmail,
+      subject: `Welcome to Skillseed – ${studentName}'s Account Details`,
+      html: `
+        <p>Hi there,</p>
+        <p>Your child <strong>${studentName}</strong> has been successfully registered on <strong>Skillseed</strong> 🎉</p>
+        
+        <p>Here are the login details for the student account:</p>
+        <ul>
+          <li><strong>Dashboard Link:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
+           <li><strong>Username:</strong> ${username} </li>
+          <li><strong>Password:</strong> ${password}</li>
+        </ul>
+  
+        <p>We recommend that your child updates this password after their first login for security.</p>
+        
+        <p>We’re excited to have ${studentName} onboard and can’t wait to see their learning journey grow 🚀</p>
+  
+        <p>Best regards,</p>
+        <p><strong>The Skillseed Team</strong></p>
+      `,
+    };
+
+    try {
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Student onboarding email sent:', info.response);
+    } catch (error) {
+      console.error('❌ Failed to send student onboarding email:', error);
+    }
+  }
+
+  async sendStudentOnboardingEmailSchool(
+    parentEmail: string,
+    adminEmail: string,
+    studentName: string,
+    username: string,
+    password: string,
+    dashboardUrl: string,
+  ) {
+    const mailOptions = {
+      from: process.env.MAIL_FROM,
+      to: [parentEmail, adminEmail],
       subject: `Welcome to Skillseed – ${studentName}'s Account Details`,
       html: `
         <p>Hi there,</p>

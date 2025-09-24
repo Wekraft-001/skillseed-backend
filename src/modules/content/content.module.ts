@@ -10,6 +10,10 @@ import {
   CategorySchema,
   User,
   UserSchema,
+  School,
+  SchoolSchema,
+  Mentor,
+  MentorSchema,
 } from '../schemas';
 import { ContentController } from './controllers/content.controller';
 import { ContentService } from './services/content.service';
@@ -21,6 +25,8 @@ import { ContentService } from './services/content.service';
       { name: Challenge.name, schema: ChallengeSchema },
       { name: Category.name, schema: CategorySchema },
       { name: User.name, schema: UserSchema },
+      { name: School.name, schema: SchoolSchema },
+      { name: Mentor.name, schema: MentorSchema },
     ]),
     LoggerModule,
   ],

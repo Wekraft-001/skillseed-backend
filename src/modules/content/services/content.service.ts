@@ -14,6 +14,8 @@ import {
   ChallengeDocument,
   User,
   UserDocument,
+  School,
+  Mentor,
 } from 'src/modules/schemas';
 import {
   CreateContentDto,
@@ -30,6 +32,8 @@ export class ContentService {
     @InjectModel(Challenge.name)
     private challengeModel: Model<ChallengeDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(School.name) private schoolModel: Model<School>,
+    @InjectModel(Mentor.name) private mentorModel: Model<Mentor>,
     @InjectConnection() private connection: Connection,
     private readonly logger: LoggerService,
   ) {
@@ -110,14 +114,30 @@ export class ContentService {
   async getContentForUser(userId: string, filterDto: FilterContentDto) {
     try {
       const user = await this.userModel.findById(userId);
-      if (!user) {
+      let userRole: string | null = null;
+
+      if (user) {
+        userRole = user.role;
+      } else {
+        const school = await this.schoolModel.findById(userId);
+        if (school) {
+          userRole = UserRole.SCHOOL_ADMIN;
+        } else {
+          const mentor = await this.mentorModel.findById(userId);
+          if (mentor) {
+            userRole = UserRole.MENTOR;
+          }
+        }
+      }
+
+      if (!userRole) {
         throw new NotFoundException('User not found');
       }
 
       let targetAudience: string[] = [TargetAudience.ALL];
 
       // Add audience based on user role
-      switch (user.role) {
+      switch (userRole) {
         case UserRole.PARENT:
           targetAudience.push(TargetAudience.PARENT);
           break;
