@@ -84,6 +84,7 @@ export class RewardsController {
       }
     }
   })
+
   async completeContent(
     @CurrentUser() user: User,
     @Body() payload: { educationalContentId: string; contentType: 'video' | 'book' | 'game'; contentIndex: number }
@@ -97,7 +98,7 @@ export class RewardsController {
   }
 
   @Post('complete-challenge/:challengeId')
-  @ApiOperation({ summary: 'Mark a challenge as completed' })
+  @ApiOperation({ summary: 'Mark a challenge as completed and earn a badge' })
   @ApiParam({ name: 'challengeId', type: 'string' })
   async completeChallenge(
     @CurrentUser() user: User,

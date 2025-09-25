@@ -1,16 +1,18 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { 
-  Badge, 
-  BadgeSchema, 
-  Star, 
-  StarSchema, 
-  Challenge, 
+import {
+  Badge,
+  BadgeSchema,
+  Star,
+  StarSchema,
+  Challenge,
   ChallengeSchema,
   EducationalContent,
   EducationalContentSchema,
   User,
-  UserSchema
+  UserSchema,
+  Category,
+  CategorySchema,
 } from '../schemas';
 import { RewardsService } from './rewards.service';
 import { RewardsController } from './rewards.controller';
@@ -21,6 +23,7 @@ import { RewardsController } from './rewards.controller';
       { name: Badge.name, schema: BadgeSchema },
       { name: Star.name, schema: StarSchema },
       { name: Challenge.name, schema: ChallengeSchema },
+      { name: Category.name, schema: CategorySchema },
       { name: EducationalContent.name, schema: EducationalContentSchema },
       { name: User.name, schema: UserSchema },
     ]),

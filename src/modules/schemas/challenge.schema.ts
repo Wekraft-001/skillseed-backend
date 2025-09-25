@@ -22,7 +22,7 @@ export class Challenge {
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,
-    ref: 'ChallengeCategory',
+    ref: 'Category',
     required: true,
     index: true,
   })
