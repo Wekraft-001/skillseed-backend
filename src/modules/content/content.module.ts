@@ -1,33 +1,37 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'src/common/logger/logger.module';
-import { 
-  Content, 
-  ContentSchema, 
-  Challenge, 
-  ChallengeSchema, 
-  ChallengeCategory,
-  ChallengeCategorySchema,
-  User, 
-  UserSchema 
+import {
+  Content,
+  ContentSchema,
+  Challenge,
+  ChallengeSchema,
+  Category,
+  CategorySchema,
+  User,
+  UserSchema,
+  School,
+  SchoolSchema,
+  Mentor,
+  MentorSchema,
 } from '../schemas';
 import { ContentController } from './controllers/content.controller';
-// Import removed for deprecated challenge-category controller
 import { ContentService } from './services/content.service';
-import { ChallengeCategoryService } from './services/challenge-category.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Content.name, schema: ContentSchema },
       { name: Challenge.name, schema: ChallengeSchema },
-      { name: ChallengeCategory.name, schema: ChallengeCategorySchema },
+      { name: Category.name, schema: CategorySchema },
       { name: User.name, schema: UserSchema },
+      { name: School.name, schema: SchoolSchema },
+      { name: Mentor.name, schema: MentorSchema },
     ]),
     LoggerModule,
   ],
-  controllers: [ContentController], // Removed ChallengeCategoryController
-  providers: [ContentService, ChallengeCategoryService],
-  exports: [ContentService, ChallengeCategoryService],
+  controllers: [ContentController],
+  providers: [ContentService],
+  exports: [ContentService],
 })
 export class ContentModule {}

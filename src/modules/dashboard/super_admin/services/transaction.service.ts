@@ -24,75 +24,75 @@ export class TransactionService {
     private emailService: EmailService,
   ) {}
 
-  async createParentTransaction(
-    createTransactionDto: CreateParentTransactionDto,
-  ): Promise<{ transaction: Transaction }> {
-    const session: ClientSession = await this.userModel.db.startSession();
-    let committed = false;
+  // async createParentTransaction(
+  //   createTransactionDto: CreateParentTransactionDto,
+  // ): Promise<{ transaction: Transaction }> {
+  //   const session: ClientSession = await this.userModel.db.startSession();
+  //   let committed = false;
 
-    try {
-      session.startTransaction();
+  //   try {
+  //     session.startTransaction();
 
-      const [parent, student] = await Promise.all([
-        this.userModel
-          .findById(createTransactionDto.parentId)
-          .session(session)
-          .exec(),
-        this.userModel
-          .findById(createTransactionDto.studentId)
-          .session(session)
-          .exec(),
-      ]);
+  //     const [parent, student] = await Promise.all([
+  //       this.userModel
+  //         .findById(createTransactionDto.parentId)
+  //         .session(session)
+  //         .exec(),
+  //       this.userModel
+  //         .findById(createTransactionDto.studentId)
+  //         .session(session)
+  //         .exec(),
+  //     ]);
 
-      if (!parent) {
-        throw new NotFoundException('Parent not found');
-      }
+  //     if (!parent) {
+  //       throw new NotFoundException('Parent not found');
+  //     }
 
-      if (!student) {
-        throw new NotFoundException('Student not found');
-      }
+  //     if (!student) {
+  //       throw new NotFoundException('Student not found');
+  //     }
 
-      if (student.parentEmail !== parent.email) {
-        throw new NotFoundException('Student not associated with this parent');
-      }
+  //     if (student.parentEmail !== parent.email) {
+  //       throw new NotFoundException('Student not associated with this parent');
+  //     }
 
-      const newTransaction = new this.transactionModel({
-        amount: createTransactionDto.amount,
-        paymentMethod: createTransactionDto.paymentMethod,
-        transactionType: createTransactionDto.transactionType,
-        transactionDate: new Date(),
-        notes: createTransactionDto.notes,
-        parent: parent._id,
-        student: student._id,
-      });
+  //     const newTransaction = new this.transactionModel({
+  //       amount: createTransactionDto.amount,
+  //       paymentMethod: createTransactionDto.paymentMethod,
+  //       transactionType: createTransactionDto.transactionType,
+  //       transactionDate: new Date(),
+  //       notes: createTransactionDto.notes,
+  //       parent: parent._id,
+  //       student: student._id,
+  //     });
 
-      await newTransaction.save({ session });
-      await session.commitTransaction();
-      committed = true;
+  //     await newTransaction.save({ session });
+  //     await session.commitTransaction();
+  //     committed = true;
 
-      this.logger.log(
-        `Parent transaction created: Parent ${parent.firstName} ${parent.lastName} - Student ${student.firstName} ${student.lastName} - Amount: ${newTransaction.amount}`,
-      );
+  //     this.logger.log(
+  //       `Parent transaction created: Parent ${parent.firstName} ${parent.lastName} - Student ${student.firstName} ${student.lastName} - Amount: ${newTransaction.amount}`,
+  //     );
 
-      const populatedTransaction = await this.transactionModel
-        .findById(newTransaction._id)
-        .populate('parent student')
-        .exec();
+  //     const populatedTransaction = await this.transactionModel
+  //       .findById(newTransaction._id)
+  //       .populate('parent student')
+  //       .exec();
 
-      return {
-        transaction: populatedTransaction,
-      };
-    } catch (error) {
-      await session.abortTransaction();
-      this.logger.error('Error creating parent transaction', error);
-      throw error;
-    } finally {
-      if (!committed) {
-        await session.abortTransaction();
-      }
-      session.endSession();
-    }
-  }
+  //     return {
+  //       transaction: populatedTransaction,
+  //     };
+  //   } catch (error) {
+  //     await session.abortTransaction();
+  //     this.logger.error('Error creating parent transaction', error);
+  //     throw error;
+  //   } finally {
+  //     if (!committed) {
+  //       await session.abortTransaction();
+  //     }
+  //     session.endSession();
+  //   }
+  // }
 
   async createTransaction(
     createTransactionDto: CreateTransactionDto,
@@ -119,6 +119,7 @@ export class TransactionService {
       const newTransaction = new this.transactionModel({
         schoolName: createTransactionDto.schoolName,
         amount: createTransactionDto.amount,
+        currency: createTransactionDto.currency,
         paymentMethod: createTransactionDto.paymentMethod,
         numberOfKids: createTransactionDto.numberOfKids,
         transactionType: createTransactionDto.transactionType,
@@ -234,16 +235,10 @@ export class TransactionService {
     }
   }
 
-  async getPendingSchools(): Promise<School[]> {
-    return await this.schoolModel
-      .find({ status: PaymentStatus.PENDING })
-      .populate('createdBy superAdmin')
-      .exec();
-  }
-
   async renewSchoolTransaction(dto: {
     schoolId: string;
     amount: number;
+    currency: string;
     numberOfKids: number;
     paymentMethod: string;
     transactionType?: string;
@@ -262,6 +257,7 @@ export class TransactionService {
       const newTransaction = new this.transactionModel({
         schoolName: school.schoolName,
         amount: dto.amount,
+        currency: dto.currency,
         paymentMethod: dto.paymentMethod,
         numberOfKids: dto.numberOfKids,
         transactionType: dto.transactionType || transactionType.SUBSCRIPTION,

@@ -10,6 +10,9 @@ export class RenewSchoolTransactionDto {
   @Min(0)
   amount: number;
 
+  @IsString()
+  currency: string;
+
   @IsNumber()
   @Min(1)
   numberOfKids: number;
@@ -25,5 +28,3 @@ export class RenewSchoolTransactionDto {
   @IsOptional()
   notes?: string;
 }
-
-

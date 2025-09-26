@@ -4,28 +4,12 @@ POST http://localhost:5500/api/auth/register
 Content-Type: application/json
 
 {
-    "firstName":"Yannick",
-    "lastName":"Zahinda",
-    "email":"yannick@gmail.test",
+    "firstName":"",
+    "lastName":"",
+    "email":"",
     "phoneNumber":100,
     "role":"super_admin",
-    "password":"123456"
-}
-
-## Creating a student (child)
-
-POST http://localhost:3000/api/auth/
-Content-Type: application/json
-
-{
-    "firstName":"Yannick",
-    "lastName":"Zahinda",
-    "email":"yannick@gmail.test",
-    "age":100,
-    "grade":8,
-    "role":"super_admin",
-    "password":"123456"
-    picture:{}
+    "password":""
 }
 
 ### Signin a parent / admin
@@ -34,16 +18,16 @@ POST http://localhost:3000/api/auth/signin
 Content-Type: application/json
 
 {
-    "email":"Yannick",
-    "password":"123456"
+    "email":"",
+    "password":""
 }
 
 ### Signin a student
 
-POST http://localhost:3000/api/auth/signin
+POST http://localhost:3000/api/auth/child/signin
 Content-Type: application/json
 
 {
-    "firstName":"Yannick",
-    "password":"123456"
+    "firstName":"",
+    "password":""
 }

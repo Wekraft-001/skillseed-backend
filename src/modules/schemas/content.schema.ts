@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { ContentCategory, ContentType, TargetAudience } from '../content/dtos';
+import { ContentType, TargetAudience } from '../content/dtos';
 
 export type ContentDocument = Content & Document;
 
@@ -12,27 +12,19 @@ export class Content {
   @Prop({ required: true })
   description: string;
 
-  @Prop({ 
-    type: String, 
-    enum: ContentType, 
+  @Prop({
+    type: String,
+    enum: ContentType,
     required: true,
-    index: true 
+    index: true,
   })
   type: ContentType;
 
-  @Prop({ 
-    type: String, 
-    enum: ContentCategory, 
+  @Prop({
+    type: String,
+    enum: TargetAudience,
     required: true,
-    index: true
-  })
-  category: ContentCategory;
-
-  @Prop({ 
-    type: String, 
-    enum: TargetAudience, 
-    required: true,
-    index: true
+    index: true,
   })
   targetAudience: TargetAudience;
 

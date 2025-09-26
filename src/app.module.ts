@@ -14,14 +14,13 @@ import {
   Mentor,
 } from './modules/schemas';
 import { LoggerModule } from './common/logger/logger.module';
-import { UserModule } from './modules/users/user.module';
 import { AiModule } from './modules/ai/ai.module';
 import {
   DashboardModule,
   SchoolModule,
   TransactionModule,
   MentorModule,
-  MentorCredentialModule,
+  CommunityModule,
 } from './modules/dashboard/super_admin/modules/index';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SubscriptionModule } from './subscription/subscription.module';
@@ -32,10 +31,8 @@ import { ParentDashboardModule } from './modules/dashboard/parents/module/dashbo
 import { MentorDashboardModule } from './modules/dashboard/mentors/module/dashboard.module';
 import { StudentDashboardModule } from './modules/dashboard/student/module/dashboard.module';
 import { ContentModule } from './modules/content/content.module';
-import { CommunityModule } from './modules/community/community.module';
 import { RewardsModule } from './modules/rewards/rewards.module';
 import { ReportsModule } from './modules/reports/reports.module';
-import { SuperAdminModule } from './modules/super_admin/super_admin.module';
 
 @Module({
   imports: [
@@ -59,25 +56,22 @@ import { SuperAdminModule } from './modules/super_admin/super_admin.module';
       inject: [ConfigService],
     }),
     AuthModule,
-    UserModule,
     AiModule,
     SchoolModule,
     MentorModule,
+    CommunityModule,
     SchoolDashboardModule,
     ParentDashboardModule,
     MentorDashboardModule,
     StudentDashboardModule,
     DashboardModule,
-    MentorCredentialModule,
     SubscriptionModule,
     RedisModule,
     TransactionModule,
     PaymentModule,
     ContentModule,
-    CommunityModule,
     RewardsModule,
     ReportsModule,
-    SuperAdminModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],

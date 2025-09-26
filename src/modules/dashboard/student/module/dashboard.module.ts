@@ -1,27 +1,28 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { 
-  CareerQuiz, 
-  CareerQuizSchema, 
-  EducationalContent, 
+import {
+  CareerQuiz,
+  CareerQuizSchema,
+  EducationalContent,
   EducationalContentSchema,
   User,
   UserSchema,
   Challenge,
   ChallengeSchema,
   Community,
-  CommunitySchema
+  CommunitySchema,
+  CategorySchema,
+  Category,
 } from 'src/modules/schemas';
 import { LoggerModule } from 'src/common/logger/logger.module';
 import { AiModule } from 'src/modules/ai/ai.module';
-import { StudentDashboardController } from '../controller/dashboard.controller';
+import { StudentDashboardController } from '../controllers/dashboard.controllers';
 import { StudentDashboardService } from '../services/dashboard.service';
 import { StudentChallengesController } from '../controllers/challenges.controller';
 import { StudentChallengesService } from '../services/challenges.service';
 import { ContentModule } from 'src/modules/content/content.module';
 import { StudentCommunitiesController } from '../controllers/communities.controller';
 import { StudentCommunitiesService } from '../services/communities.service';
-import { CommunityModule } from 'src/modules/community/community.module';
 import { RewardsModule } from 'src/modules/rewards/rewards.module';
 
 @Module({
@@ -32,22 +33,22 @@ import { RewardsModule } from 'src/modules/rewards/rewards.module';
       { name: EducationalContent.name, schema: EducationalContentSchema },
       { name: Challenge.name, schema: ChallengeSchema },
       { name: Community.name, schema: CommunitySchema },
+      { name: Category.name, schema: CategorySchema },
     ]),
     LoggerModule,
     AiModule,
     ContentModule,
-    CommunityModule,
     RewardsModule,
   ],
   controllers: [
-    StudentDashboardController, 
+    StudentDashboardController,
     StudentChallengesController,
-    StudentCommunitiesController
+    StudentCommunitiesController,
   ],
   providers: [
-    StudentDashboardService, 
+    StudentDashboardService,
     StudentChallengesService,
-    StudentCommunitiesService
+    StudentCommunitiesService,
   ],
   exports: [StudentDashboardService],
 })

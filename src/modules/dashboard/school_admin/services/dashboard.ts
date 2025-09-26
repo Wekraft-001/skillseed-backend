@@ -11,6 +11,12 @@ import {
 import { School, User } from '../../../schemas/index';
 import { CreateStudentDto } from 'src/modules/auth/dtos';
 import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
+import { ContentService } from 'src/modules/content/services/content.service';
+import {
+  FilterContentDto,
+  FilterContentWithoutCategoryDto,
+} from 'src/modules/content/dtos';
+import { EmailService } from 'src/common/utils/mailing/email.service';
 
 @Injectable()
 export class SchoolDashboardService {
@@ -21,7 +27,11 @@ export class SchoolDashboardService {
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
 
+    private readonly contentService: ContentService,
+
     private readonly logger: LoggerService,
+
+    private emailService: EmailService,
   ) {}
 
   async getSchoolProfile(schoolId: string): Promise<School> {
@@ -72,29 +82,6 @@ export class SchoolDashboardService {
     } catch (error) {
       this.logger.error(
         `Error fetching dashboard data for user: ${user._id}`,
-        error,
-      );
-      throw error;
-    }
-  }
-
-  async getMyProfile(schoolId: string): Promise<School> {
-    try {
-      this.logger.log(`Fetching mentor profile for mentor: ${schoolId}`);
-
-      const school = await this.schoolModel
-        .findById(schoolId)
-        // .populate('createdBy')
-        .lean();
-
-      if (!school) {
-        throw new BadRequestException('Mentor not found.');
-      }
-
-      return school;
-    } catch (error) {
-      this.logger.error(
-        `Error fetching mentor profile for mentor: ${schoolId}`,
         error,
       );
       throw error;
@@ -165,6 +152,26 @@ export class SchoolDashboardService {
       await session.commitTransaction();
       committed = true;
 
+      const dashboardUrl = 'https://student.wekraft.co';
+
+      try {
+        // Send both emails in parallel for better performance
+        (await this.emailService.sendStudentOnboardingEmailSchool(
+          createStudentDto.parentEmail,
+          currentUser.email,
+          createStudentDto.firstName,
+          createStudentDto.firstName,
+          createStudentDto.plainPassword,
+          dashboardUrl,
+        ),
+          this.logger.log(
+            `Emails sent successfully for student registration: ${newStudent._id}`,
+          ));
+      } catch (emailError) {
+        // Log email error but don't fail the registration
+        this.logger.error('Failed to send registration emails:', emailError);
+      }
+
       return await this.userModel
         .findById(newStudent._id)
         .populate('createdBy');
@@ -178,18 +185,6 @@ export class SchoolDashboardService {
     }
   }
 
-  // async getStudentsForUser(user: User) {
-  //   const query: any = { role: UserRole.STUDENT };
-
-  //   if (user.role === UserRole.SCHOOL_ADMIN && user.school) {
-  //     query.school = user.school;
-  //   } else if (user.role === UserRole.PARENT) {
-  //     query.createdBy = user._id;
-  //   }
-
-  //   return this.userModel.find(query).populate('createdBy').lean();
-  // }
-
   async getStudentForUser(user: User) {
     const query: any = { role: UserRole.STUDENT };
     if (user.role === UserRole.SCHOOL_ADMIN) {
@@ -200,47 +195,6 @@ export class SchoolDashboardService {
   }
 
   // Update a child's details
-  async updateStudentt(
-    studentId: string,
-    updateData: Partial<CreateStudentDto>,
-    currentUser: User,
-    image?: Express.Multer.File,
-  ) {
-    if (currentUser.role !== UserRole.SCHOOL_ADMIN) {
-      throw new BadRequestException('Only School Admin can update students.');
-    }
-
-    const student = await this.userModel.findById(studentId);
-    if (!student || student.role !== UserRole.STUDENT) {
-      throw new BadRequestException('Student not found.');
-    }
-
-    if (student.createdBy.toString() !== currentUser._id.toString()) {
-      throw new BadRequestException('You cannot update this student.');
-    }
-
-    const updatePayload: any = { ...updateData };
-
-    // Handle image separately
-    if (image) {
-      const imageUrl = await uploadToAzureStorage(image);
-      updatePayload.image = imageUrl;
-    }
-
-    // Hash password if provided
-    if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 10);
-    }
-
-    // Update the student
-    await this.userModel.findByIdAndUpdate(studentId, updateData, {
-      new: true,
-    });
-
-    // Return updated student with populated createdBy
-    return this.userModel.findById(studentId).populate('createdBy');
-  }
-
   async updateStudent(
     studentId: string,
     updateData: Partial<CreateStudentDto>,

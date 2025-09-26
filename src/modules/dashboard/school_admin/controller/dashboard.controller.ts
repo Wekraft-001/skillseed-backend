@@ -9,6 +9,10 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Query,
+  Param,
+  Delete,
+  Patch,
 } from '@nestjs/common';
 import { SchoolDashboardService } from '../services/index';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -21,7 +25,18 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from 'src/modules/schemas';
 import { Model } from 'mongoose';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  ContentType,
+  FilterContentWithoutCategoryDto,
+} from 'src/modules/content/dtos';
+import { CurrentUser } from 'src/common/decorators';
 
 @Controller('school/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,7 +61,7 @@ export class SchoolDashboardController {
   @HttpCode(HttpStatus.OK)
   async getProfile(@Request() req) {
     const schoolId = req.user._id;
-    return this.schoolDashboardService.getMyProfile(schoolId);
+    return this.schoolDashboardService.getSchoolProfile(schoolId);
   }
 
   @Post('register-student')
@@ -68,7 +83,7 @@ export class SchoolDashboardController {
     );
   }
 
-  @Get('student')
+  @Get('students')
   @HttpCode(HttpStatus.OK)
   @Roles(UserRole.SCHOOL_ADMIN)
   async getStudent(@Request() req) {
@@ -78,6 +93,77 @@ export class SchoolDashboardController {
       return await this.schoolDashboardService.getStudentForUser(user);
     } catch (error) {
       this.logger.error(`Error fetching student for user: ${user._id}`, error);
+      throw error;
+    }
+  }
+
+  // NEW: Update Student Endpoint
+  @Patch('students/:studentId')
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiOperation({
+    summary: 'Update a student by ID (School Admin only)',
+  })
+  @ApiParam({ name: 'studentId', description: 'Student ID to update' })
+  @ApiResponse({ status: 200, description: 'Student updated successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Student not found or unauthorized',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only School Admin can update students',
+  })
+  async updateStudent(
+    @Param('studentId') studentId: string,
+    @UploadedFile() image: Express.Multer.File,
+    @Body() updateData: Partial<CreateStudentDto>,
+    @Request() req,
+  ) {
+    const currentUser = req.user;
+    try {
+      this.logger.log(
+        `Updating student: ${studentId} by admin: ${currentUser.email}`,
+      );
+      return await this.schoolDashboardService.updateStudent(
+        studentId,
+        updateData,
+        currentUser,
+        image,
+      );
+    } catch (error) {
+      this.logger.error(`Error updating student: ${studentId}`, error);
+      throw error;
+    }
+  }
+
+  // NEW: Delete Student Endpoint
+  @Delete('students/:studentId')
+  @ApiOperation({
+    summary: 'Delete a student by ID (School Admin only)',
+  })
+  @ApiParam({ name: 'studentId', description: 'Student ID to delete' })
+  @ApiResponse({ status: 200, description: 'Student deleted successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Student not found or unauthorized',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only School Admin can delete students',
+  })
+  @HttpCode(HttpStatus.OK)
+  async deleteStudent(@Param('studentId') studentId: string, @Request() req) {
+    const currentUser = req.user;
+    try {
+      this.logger.log(
+        `Deleting student: ${studentId} by admin: ${currentUser.email}`,
+      );
+      return await this.schoolDashboardService.deleteStudent(
+        studentId,
+        currentUser,
+      );
+    } catch (error) {
+      this.logger.error(`Error deleting student: ${studentId}`, error);
       throw error;
     }
   }

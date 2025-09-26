@@ -47,22 +47,22 @@ export class StudentChallengesController {
     return this.challengesService.getChallengeById(id);
   }
 
-  @Post(':id/complete')
-  @ApiOperation({ summary: 'Mark a challenge as completed and earn a badge' })
-  async completeChallenge(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ) {
-    // First check if the challenge exists
-    const challenge = await this.challengesService.getChallengeById(id);
+  // @Post(':id/complete')
+  // @ApiOperation({ summary: 'Mark a challenge as completed and earn a badge' })
+  // async completeChallenge(
+  //   @CurrentUser() user: User,
+  //   @Param('id') id: string,
+  // ) {
+  //   // First check if the challenge exists
+  //   const challenge = await this.challengesService.getChallengeById(id);
     
-    // Then award a badge for completing it
-    const badge = await this.rewardsService.completeChallenge((user as any)._id, id);
+  //   // Then award a badge for completing it
+  //   const badge = await this.rewardsService.completeChallenge((user as any)._id, id);
     
-    return {
-      message: 'Challenge completed successfully',
-      challenge,
-      badge
-    };
-  }
+  //   return {
+  //     message: 'Challenge completed successfully',
+  //     challenge,
+  //     badge
+  //   };
+  // }
 }

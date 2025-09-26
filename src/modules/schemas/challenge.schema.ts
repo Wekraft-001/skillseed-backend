@@ -12,24 +12,27 @@ export class Challenge {
   @Prop({ required: true })
   description: string;
 
-  @Prop({ 
-    type: String, 
-    enum: ChallengeType, 
+  @Prop({
+    type: String,
+    enum: ChallengeType,
     required: true,
-    index: true 
+    index: true,
   })
   type: ChallengeType;
 
-  @Prop({ 
-    type: MongooseSchema.Types.ObjectId, 
-    ref: 'ChallengeCategory',
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Category',
     required: true,
-    index: true
+    index: true,
   })
   categoryId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
   difficultyLevel: string;
+
+  @Prop({ required: true })
+  theme: string;
 
   @Prop({ required: true })
   estimatedTime: string;
@@ -38,7 +41,7 @@ export class Challenge {
     type: String,
     enum: AgeRange,
     required: true,
-    index: true
+    index: true,
   })
   ageRange: AgeRange;
 

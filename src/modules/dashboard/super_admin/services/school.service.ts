@@ -4,7 +4,7 @@ import { ClientSession, Model, Types } from 'mongoose';
 import { School } from '../../school_admin/schema/school.schema';
 import { User, UserDocument } from '../../../schemas';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { PasswordService } from '../../super_admin/services';
+import { PasswordService } from '.';
 import { CreateSchoolDto, UserRole } from 'src/common/interfaces';
 import { uploadToAzureStorage } from 'src/common/utils/azure-upload.util';
 import { EmailService } from '../../../../common/utils/mailing/email.service';

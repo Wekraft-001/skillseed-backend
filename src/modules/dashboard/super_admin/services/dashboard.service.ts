@@ -1,28 +1,39 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { AiService } from '../../../ai/ai.service';
 import {
   DashboardData,
   DashboardResponse,
   DashboardSummary,
   UserRole,
 } from 'src/common/interfaces';
-
+import {
+  User,
+  Category,
+  CategoryDocument,
+  UserDocument,
+  Badge,
+} from '../../../schemas';
+import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto';
 import { EducationalContent } from '../../../schemas/educational_content.schema';
-import { Badge, User } from '../../../schemas';
 import { ProjectShowcase } from '../../../schemas/showcase.schema';
 import { CareerQuiz } from '../../../schemas/career-quiz.schema';
 import { School } from '../../school_admin/schema/school.schema';
+import { AiService } from 'src/modules/ai/ai.service';
 
 @Injectable()
 export class DashboardService {
   constructor(
+    @InjectModel(Category.name)
+    private categoryModel: Model<CategoryDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+
     @InjectModel(EducationalContent.name)
     private readonly eduContentModel: Model<EducationalContent>,
 
@@ -38,17 +49,13 @@ export class DashboardService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
 
-    @InjectModel(User.name)
-    private readonly userModel: Model<User>,
-
-    private readonly logger: LoggerService,
     private readonly aiService: AiService,
+    private readonly logger: LoggerService,
   ) {}
 
   async getDashboardData(user: User): Promise<{
     dashboardResponse: DashboardResponse;
     summary: DashboardSummary;
-    currentUser: User;
   }> {
     try {
       this.logger.log(
@@ -88,19 +95,17 @@ export class DashboardService {
       })();
 
       const dashboardResponse: DashboardResponse = {
-        ...data,
         success: true,
         message: 'Dashboard data retrieved successfully',
         timestamp: new Date().toISOString(),
         userId: (user as any)._id,
-        summary,
+
         currentUser: user,
       };
 
       return {
         dashboardResponse,
         summary,
-        currentUser: user,
       };
     } catch (error) {
       this.logger.error(
@@ -110,7 +115,7 @@ export class DashboardService {
       throw error;
     }
   }
-
+  // ALL DASHBOARD DATA
   private async getSuperAdminDashboardData(user: User): Promise<DashboardData> {
     const [schools, students] = await Promise.all([
       this.schoolModel
@@ -277,5 +282,216 @@ export class DashboardService {
     };
   }
 
-  
+  // ENDPOINTS FOR CATEGORY
+  // CREATE CATEGORY
+  // async create(createDto: CreateCategoryDto, userId: string) {
+  //   try {
+  //     // Check if user is a super admin
+  //     const user = await this.userModel.findById(userId);
+  //     if (!user) {
+  //       throw new NotFoundException('User not found');
+  //     }
+
+  //     if (user.role !== UserRole.SUPER_ADMIN) {
+  //       throw new BadRequestException(
+  //         'Only super admins can create categories',
+  //       );
+  //     }
+
+  //     // Check if category with same name already exists
+  //     const existingCategory = await this.categoryModel.findOne({
+  //       name: createDto.name,
+  //     });
+  //     if (existingCategory) {
+  //       throw new BadRequestException(
+  //         `Category with name "${createDto.name}" already exists`,
+  //       );
+  //     }
+
+  //     const newCategory = new this.categoryModel({
+  //       ...createDto,
+  //       createdBy: new Types.ObjectId(userId),
+  //     });
+
+  //     const savedCategory = await newCategory.save();
+  //     this.logger.log(
+  //       `Category created: ${savedCategory._id} by user ${userId}`,
+  //     );
+
+  //     return savedCategory;
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `Error creating category: ${error.message}`,
+  //       error.stack,
+  //     );
+  //     throw error;
+  //   }
+  // }
+  async create(createDto: CreateCategoryDto) {
+    try {
+      // Check if category with same name already exists
+      const existingCategory = await this.categoryModel.findOne({
+        name: createDto.name,
+      });
+      if (existingCategory) {
+        throw new BadRequestException(
+          `Category with name "${createDto.name}" already exists`,
+        );
+      }
+
+      const newCategory = new this.categoryModel({
+        ...createDto,
+        // Remove the createdBy field or make it optional
+      });
+
+      const savedCategory = await newCategory.save();
+      this.logger.log(`Category created: ${savedCategory._id}`);
+
+      return savedCategory;
+    } catch (error) {
+      this.logger.error(
+        `Error creating category: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // GET CATEGORIES
+  async findAll() {
+    try {
+      return this.categoryModel.find().sort({ name: 1 }).exec();
+    } catch (error) {
+      this.logger.error(
+        `Error finding all categories: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // GET CATEGORY BY ID
+  async findOne(id: string) {
+    try {
+      const category = await this.categoryModel.findById(id).exec();
+      if (!category) {
+        throw new NotFoundException(`Category with ID ${id} not found`);
+      }
+      return category;
+    } catch (error) {
+      this.logger.error(
+        `Error finding category by ID ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // EDIT CATEGORY
+  async update(id: string, updateDto: UpdateCategoryDto, userId: string) {
+    try {
+      // Check if user is a super admin
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        throw new BadRequestException(
+          'Only super admins can update categories',
+        );
+      }
+
+      // Check if category exists
+      const existingCategory = await this.categoryModel.findById(id).exec();
+      if (!existingCategory) {
+        throw new NotFoundException(`Category with ID ${id} not found`);
+      }
+
+      // Check if name is being updated and is unique
+      if (updateDto.name && updateDto.name !== existingCategory.name) {
+        const nameExists = await this.categoryModel
+          .findOne({
+            name: updateDto.name,
+            _id: { $ne: id },
+          })
+          .exec();
+
+        if (nameExists) {
+          throw new BadRequestException(
+            `Category with name "${updateDto.name}" already exists`,
+          );
+        }
+      }
+
+      const updatedCategory = await this.categoryModel
+        .findByIdAndUpdate(id, updateDto, { new: true })
+        .exec();
+
+      this.logger.log(`Category updated: ${id} by user ${userId}`);
+
+      return updatedCategory;
+    } catch (error) {
+      this.logger.error(
+        `Error updating category ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // DELETE CATEGORY
+  async remove(id: string, userId: string) {
+    try {
+      // Check if user is a super admin
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        throw new BadRequestException(
+          'Only super admins can delete categories',
+        );
+      }
+
+      // Check if category exists
+      const existingCategory = await this.categoryModel.findById(id).exec();
+      if (!existingCategory) {
+        throw new NotFoundException(`Category with ID ${id} not found`);
+      }
+
+      // TODO: Check if category is in use by any challenges or communities
+      // If needed, this would involve checking references in other collections
+
+      const deletedCategory = await this.categoryModel
+        .findByIdAndDelete(id)
+        .exec();
+      this.logger.log(`Category deleted: ${id} by user ${userId}`);
+
+      return deletedCategory;
+    } catch (error) {
+      this.logger.error(
+        `Error deleting category ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // USERS SERVICES
+  async findAllUsers(): Promise<User[]> {
+    return this.userModel
+      .find({ deletedAt: null })
+      .populate('school')
+      .populate('createdBy')
+      .populate('subscription')
+      .lean()
+      .exec();
+  }
+
+  async findById(userId: string | Types.ObjectId) {
+    if (!userId) return null;
+    return this.userModel.findById(userId).lean().exec();
+  }
 }

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PasswordService } from '../../super_admin/services';
-import { MentorOnboardingService } from '../services/mentor-onboarding.service';
+import { MentorOnboardingService } from '../services/mentor.service';
 import { LoggerModule } from '../../../../common/logger/logger.module';
 import { Mentor, MentorSchema } from '../../../schemas';
 import { EmailModule } from 'src/common/utils/mailing/email.module';
