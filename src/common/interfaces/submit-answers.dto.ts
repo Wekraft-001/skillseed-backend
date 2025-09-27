@@ -32,6 +32,10 @@ export class AnswerDto {
   @IsInt()
   questionIndex: number;
 
+  @IsInt()
+  @IsOptional()
+  phaseIndex?: number;
+
   @IsString()
   @IsNotEmpty()
   answer: string;

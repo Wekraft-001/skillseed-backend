@@ -55,7 +55,7 @@ export class AiController {
               questionIndex: { type: 'number', example: 1 },
               answer: { type: 'string', example: 'Often' },
             },
-            required: ['phaseIndex', 'questionIndex', 'answer'],
+            required: ['questionIndex', 'answer'],
           },
         },
       },
@@ -284,7 +284,7 @@ export class AiController {
               questionIndex: { type: 'number' },
               answer: { type: 'string' },
             },
-            required: ['phaseIndex', 'questionIndex', 'answer'],
+            required: ['questionIndex', 'answer'],
           },
         },
       },
@@ -296,7 +296,7 @@ export class AiController {
     body: {
       sessionId: string;
       quizId: string;
-      answers: { phaseIndex: number; questionIndex: number; answer: string }[];
+      answers: { phaseIndex?: number; questionIndex: number; answer: string }[];
     },
   ) {
     return this.aiService.submitGuestAnswers(body);

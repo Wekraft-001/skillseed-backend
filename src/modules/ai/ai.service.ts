@@ -63,7 +63,11 @@ export class AiService {
     return {
       quizId: quizDoc._id.toString(),
       quiz: {
-        questions: quizDoc.questions
+        questions: quizDoc.questions.map(q => ({
+          text: q.text,
+          answers: q.answers,
+          _id: new Types.ObjectId().toString() // Generate unique IDs for each question
+        }))
       }
     };
   }
@@ -304,7 +308,7 @@ export class AiService {
   async analyzeGuestAnswers(params: {
     sessionId: string;
     quizId: string;
-    answers: { phaseIndex: number; questionIndex: number; answer: string }[];
+    answers: { phaseIndex?: number; questionIndex: number; answer: string }[];
   }) {
     const key = this.guestKey(params.sessionId, params.quizId);
     const raw = await this.redisService.get(key);
@@ -313,16 +317,8 @@ export class AiService {
 
     const answersText: string[] = [];
     for (const a of params.answers) {
-      // Check if the quiz structure has changed and questions might be at the top level
-      let question;
-      if (state.quiz?.phases) {
-        // Old structure with phases
-        const phase = state.quiz?.phases?.[a.phaseIndex];
-        question = phase?.questions?.[a.questionIndex];
-      } else {
-        // New structure with questions at top level
-        question = state.quiz?.questions?.[a.questionIndex];
-      }
+      // Use the new structure with questions at top level
+      const question = state.quiz?.questions?.[a.questionIndex];
       if (!question) continue;
       answersText.push(`Question: ${question.text}\nAnswer: ${a.answer}`);
     }
@@ -574,10 +570,13 @@ ${answersText.join('\n\n')}`;
     const answersText: string[] = [];
 
     for (const answer of dto.answers) {
+      // The career quiz schema has been updated and no longer uses phases
+      // So we'll just use the questions array at the top level
       const question = quiz.questions[answer.questionIndex];
+      
       if (!question) {
         throw new BadRequestException(
-          `Invalid questionIndex: ${answer.questionIndex} `,
+          `Invalid question reference: questionIndex=${answer.questionIndex}`,
         );
       }
 
