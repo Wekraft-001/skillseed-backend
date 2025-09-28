@@ -11,6 +11,7 @@ import { Model, Types } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { RedisService } from 'src/redis/redis.service';
 import { CareerQuiz, CareerQuizDocument } from '../schemas/career-quiz.schema';
+import { RewardsService } from '../rewards/rewards.service';
 import {
   EducationalContent,
   EducationalContentDocument,
@@ -32,6 +33,7 @@ export class AiService {
     private readonly logger: LoggerService,
     // Redis injected via Global module
     private readonly redisService: RedisService,
+    private readonly rewardsService: RewardsService,
 
     @InjectModel(CareerQuiz.name)
     private readonly quizModel: Model<CareerQuizDocument>,
@@ -676,6 +678,16 @@ Format your overall response in a clear, encouraging manner suitable for a curio
     const user = await this.userModel.findById(result.userId)
       .select('-password')  // Exclude sensitive information
       .exec();
+
+    try {
+      // Award stars for quiz completion
+      this.logger.log(`Awarding stars for quiz completion to user ${result.userId} for quiz ${dto.quizId}`);
+      await this.rewardsService.awardQuizCompletionStars(result.userId, dto.quizId);
+      this.logger.log(`Successfully awarded stars for quiz ${dto.quizId}`);
+    } catch (error) {
+      // Log the error but don't fail the whole operation
+      this.logger.error(`Failed to award stars for quiz ${dto.quizId}: ${error.message}`);
+    }
       
     // Include user details in the response
     this.logger.log(`Successfully analyzed answers for quiz ${dto.quizId}, completed: ${result.quizId}`);

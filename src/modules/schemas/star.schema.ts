@@ -6,8 +6,8 @@ export type StarDocument = Star & Document;
 
 @Schema({ timestamps: true })
 export class Star {
-  @Prop({ required: true, enum: ['video', 'book', 'game'], index: true })
-  contentType: 'video' | 'book' | 'game';
+  @Prop({ required: true, enum: ['video', 'book', 'game', 'quiz', 'project', 'community', 'mentor_session', 'mentor_review'], index: true })
+  contentType: 'video' | 'book' | 'game' | 'quiz' | 'project' | 'community' | 'mentor_session' | 'mentor_review';
 
   @Prop({ required: true, index: true })
   contentId: string;
@@ -24,8 +24,11 @@ export class Star {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   user: Types.ObjectId | User;
 
-  @Prop({ type: Types.ObjectId, ref: 'EducationalContent', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'EducationalContent', required: false, index: true })
   educationalContent: Types.ObjectId;
+  
+  @Prop({ type: Number, default: 1 })
+  starValue: number;
 }
 
 export const StarSchema = SchemaFactory.createForClass(Star);

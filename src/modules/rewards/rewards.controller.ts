@@ -106,18 +106,64 @@ export class RewardsController {
   ) {
     return this.rewardsService.completeChallenge((user as any)._id, challengeId);
   }
+  
+  @Post('complete-quiz/:quizId')
+  @ApiOperation({ summary: 'Mark quiz as completed and earn stars' })
+  @ApiParam({ name: 'quizId', type: 'string' })
+  async completeQuiz(
+    @CurrentUser() user: User,
+    @Param('quizId') quizId: string
+  ) {
+    return this.rewardsService.awardQuizCompletionStars((user as any)._id, quizId);
+  }
+
+  @Post('community-post/:postId')
+  @ApiOperation({ summary: 'Award stars for community post' })
+  @ApiParam({ name: 'postId', type: 'string' })
+  async communityPost(
+    @CurrentUser() user: User,
+    @Param('postId') postId: string
+  ) {
+    return this.rewardsService.awardCommunityPostStars((user as any)._id, postId);
+  }
+
+  @Post('mentor-session/:sessionId')
+  @ApiOperation({ summary: 'Award stars for mentor session' })
+  @ApiParam({ name: 'sessionId', type: 'string' })
+  async mentorSession(
+    @CurrentUser() user: User,
+    @Param('sessionId') sessionId: string
+  ) {
+    return this.rewardsService.awardMentorSessionStars((user as any)._id, sessionId);
+  }
+
+  @Post('mentor-review/:reviewId')
+  @ApiOperation({ summary: 'Award stars for mentor review' })
+  @ApiParam({ name: 'reviewId', type: 'string' })
+  async mentorReview(
+    @CurrentUser() user: User,
+    @Param('reviewId') reviewId: string
+  ) {
+    return this.rewardsService.awardMentorReviewStars((user as any)._id, reviewId);
+  }
 
   @Get('progress')
   @ApiOperation({ summary: 'Get student progress towards next tier badges' })
   async getProgressToNextTier(@CurrentUser() user: User) {
     const summary = await this.rewardsService.getStudentRewardsSummary((user as any)._id);
     
+    // Calculate total activities count from educational content
+    const totalActivities = 
+      (summary.starsByType.video > 0 ? 1 : 0) + 
+      (summary.starsByType.book > 0 ? 1 : 0) + 
+      (summary.starsByType.game > 0 ? 1 : 0);
+    
     // Calculate progress towards each tier
     const progress = {
       bronze: {
         requirement: 3,
-        current: Math.min(summary.starsByType.video + summary.starsByType.book + summary.starsByType.game, 3),
-        completed: summary.starsByType.video + summary.starsByType.book + summary.starsByType.game >= 3
+        current: Math.min(totalActivities, 3),
+        completed: totalActivities >= 3
       },
       silver: {
         requirement: 100,
