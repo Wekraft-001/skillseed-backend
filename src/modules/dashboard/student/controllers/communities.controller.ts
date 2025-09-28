@@ -37,8 +37,8 @@ export class StudentCommunitiesController {
     required: false,
     description: 'Search by name or description',
   })
-  async getAllCommunities() {
-    return this.communitiesService.getCommunities();
+  async getAllCommunities(@CurrentUser() user: User) {
+    return this.communitiesService.getCommunities((user as any)._id);
   }
 
   // @Get('joined')
@@ -50,8 +50,8 @@ export class StudentCommunitiesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get community details by ID' })
   @ApiParam({ name: 'id', description: 'Community ID' })
-  async getCommunityDetails(@Param('id') id: string) {
-    return this.communitiesService.getCommunityDetails(id);
+  async getCommunityDetails(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.communitiesService.getCommunityDetails(id, (user as any)._id);
   }
 
   @Post(':id/join')
