@@ -594,12 +594,21 @@ ${answersText.join('\n\n')}
 
 Please provide:
 1. Analysis of ${userName}'s interests and strengths
-2. Potential career paths that align with their responses
+2. Potential career paths that align with their responses - list at least 5 specific careers (e.g. Software Developer, Marine Biologist, Graphic Designer)
 3. Skills they should develop
 4. Educational recommendations
 5. Next steps for career exploration
 
-Format your response in a clear, encouraging manner suitable for a curious student.
+IMPORTANT: For career paths, provide exactly 4-5 specific career options in a clear, bullet-point list format.
+Format the career section like this:
+"Potential career paths:
+• Career 1
+• Career 2
+• Career 3
+• Career 4
+• Career 5"
+
+Format your overall response in a clear, encouraging manner suitable for a curious student.
 `.trim();
 
     const response = await this.openai.chat.completions.create({
@@ -906,6 +915,90 @@ For example:
   }
   
   /**
+   * Special extractor for career recommendations when they don't have percentages
+   * This helps with the newer AI responses that don't follow the expected format
+   */
+  private extractCareerSection(analysis: string): Array<{career: string, matchPercentage: number, emoji: string}> {
+    const careers = [];
+    const careerEmojis = ['👩‍💻', '🧑‍🔬', '👨‍🏫', '👩‍🎨', '🧑‍⚕️', '🧑‍🔧', '👨‍💼', '👩‍✈️', '👨‍🚀', '🧑‍🍳'];
+    
+    try {
+      // Look for a section with career recommendations
+      let careerParagraph = '';
+      
+      // First look for a section explicitly about careers
+      const careerSectionMatch = analysis.match(/(?:Potential career paths|Career recommendations|Career options)[\s\S]*?(?:\d\.|Next steps|$)/i);
+      if (careerSectionMatch) {
+        careerParagraph = careerSectionMatch[0];
+      } else {
+        // Try to find any section mentioning careers
+        const paragraphs = analysis.split('\n\n');
+        for (const paragraph of paragraphs) {
+          if (paragraph.toLowerCase().includes('career') || 
+              paragraph.toLowerCase().includes('profession') || 
+              paragraph.toLowerCase().includes('occupation')) {
+            careerParagraph = paragraph;
+            break;
+          }
+        }
+      }
+      
+      if (careerParagraph) {
+        // Try to extract individual career names
+        let careerList: string[] = [];
+        
+        // Check for numbered or bulleted list
+        const listItems = careerParagraph.match(/(?:^|\n)(?:\d+\.|[-•*])\s*(.*?)(?=(?:\n(?:\d+\.|[-•*]))|$)/gm);
+        
+        if (listItems && listItems.length > 0) {
+          // Extract career names from list items
+          careerList = listItems.map(item => {
+            // Remove the bullet/number and trim
+            return item.replace(/(?:^|\n)(?:\d+\.|[-•*])\s*/, '').trim();
+          });
+        } else {
+          // If no list formatting, split by commas and "and"
+          careerParagraph = careerParagraph.replace(/(?:Potential career paths|Career recommendations|Career options)[^\w]*:?/i, '');
+          careerList = careerParagraph.split(/(?:,|\sand\s)/i)
+            .map(c => c.trim())
+            .filter(c => c.length > 0 && c.length < 50); // Filter out very long phrases which are likely paragraphs
+        }
+        
+        // Add each career with a random emoji and match percentage
+        let index = 0;
+        for (const career of careerList) {
+          // Skip if it's not a career (too short or contains specific non-career terms)
+          if (career.length < 3 || 
+              /\b(you|should|next|step|include|recommend|skill)\b/i.test(career)) {
+            continue;
+          }
+          
+          // Get a random emoji from the career emoji list
+          const emoji = careerEmojis[index % careerEmojis.length];
+          
+          // Generate a match percentage between 75-98%
+          // Start with higher percentages for first items in the list
+          const basePercentage = 98 - (index * 3);
+          const matchPercentage = Math.max(75, Math.min(98, basePercentage));
+          
+          careers.push({
+            career,
+            emoji,
+            matchPercentage
+          });
+          
+          index++;
+        }
+      }
+      
+      return careers;
+    } catch (error) {
+      this.logger.warn(`Error in special career extraction: ${error.message}`);
+      return [];
+    }
+  }
+  
+  /**
    * Get career recommendations from a user's quiz analysis
    * This extracts the career recommendations and their match percentages
    * from the AI-generated analysis text
@@ -932,7 +1025,17 @@ For example:
       
       this.logger.log(`Extracted ${traits.length} traits and ${careers.length} career recommendations`);
       
-      // If both are empty, log more details about the analysis
+      // If careers are empty, try our special career extractor
+      if (careers.length === 0) {
+        this.logger.log('No careers found with standard extraction, trying special career extractor');
+        const specialCareers = this.extractCareerSection(quiz.analysis);
+        if (specialCareers.length > 0) {
+          this.logger.log(`Found ${specialCareers.length} careers with special extractor`);
+          careers.push(...specialCareers);
+        }
+      }
+      
+      // If both are still empty, log more details about the analysis
       if (traits.length === 0 && careers.length === 0) {
         this.logger.warn('Failed to extract any traits or careers. Analysis format may be unexpected.');
         this.logger.debug(`Analysis format check: Contains newlines: ${quiz.analysis.includes('\n')}`);
@@ -1079,83 +1182,92 @@ For example:
     };
     
     try {
-      // Split by any combination of newlines or multiple spaces
-      const lines = analysis.split(/[\n\s]{2,}/);
+      // First, let's see if we can extract specific career recommendations
+      const careerSection = this.extractCareerSection(analysis);
+      if (careerSection && careerSection.length > 0) {
+        result.careers = careerSection;
+      }
       
-      for (const line of lines) {
-        const trimmedLine = line.trim();
+      // If no careers were found using the special extractor, try the old method
+      if (result.careers.length === 0) {
+        // Split by any combination of newlines or multiple spaces
+        const lines = analysis.split(/[\n\s]{2,}/);
         
-        // Skip empty lines
-        if (!trimmedLine) continue;
-        
-        // Look for percentage matches which likely indicate careers
-        if (trimmedLine.includes('%')) {
-          // Attempt to extract a career and percentage
-          const parts = trimmedLine.split(/[-–]/); // Handle different dash types
+        for (const line of lines) {
+          const trimmedLine = line.trim();
           
-          if (parts.length >= 1) {
-            // The career name should be in the first part
-            const careerName = parts[0].trim();
+          // Skip empty lines
+          if (!trimmedLine) continue;
+          
+          // Look for percentage matches which likely indicate careers
+          if (trimmedLine.includes('%')) {
+            // Attempt to extract a career and percentage
+            const parts = trimmedLine.split(/[-–]/); // Handle different dash types
             
-            // Try to extract a percentage from any part
-            let matchPercentage = 0;
-            for (const part of parts) {
-              const percentMatch = part.match(/([\d]+)%/);
-              if (percentMatch) {
-                matchPercentage = parseInt(percentMatch[1], 10);
-                break;
+            if (parts.length >= 1) {
+              // The career name should be in the first part
+              const careerName = parts[0].trim();
+              
+              // Try to extract a percentage from any part
+              let matchPercentage = 0;
+              for (const part of parts) {
+                const percentMatch = part.match(/([\d]+)%/);
+                if (percentMatch) {
+                  matchPercentage = parseInt(percentMatch[1], 10);
+                  break;
+                }
+              }
+              
+              // Only add if we have both a career name and a percentage
+              if (careerName && matchPercentage > 0) {
+                // Try to find an emoji at the start
+                const emoji = /^[^\w\s]/.test(careerName) ? careerName.charAt(0) : '🌟';
+                
+                // Clean the career name if it starts with an emoji
+                const cleanCareerName = /^[^\w\s]/.test(careerName) 
+                  ? careerName.substring(1).trim() 
+                  : careerName;
+                
+                result.careers.push({
+                  emoji,
+                  career: cleanCareerName,
+                  matchPercentage
+                });
               }
             }
+          }
+          // If the line has at least 15 characters and doesn't have a percentage, it might be a trait
+          else if (trimmedLine.length > 15 && !trimmedLine.toLowerCase().includes('career')) {
+            // Try to find an emoji at the start
+            const emoji = /^[^\w\s]/.test(trimmedLine) ? trimmedLine.charAt(0) : '🧠';
             
-            // Only add if we have both a career name and a percentage
-            if (careerName && matchPercentage > 0) {
-              // Try to find an emoji at the start
-              const emoji = /^[^\w\s]/.test(careerName) ? careerName.charAt(0) : '🌟';
-              
-              // Clean the career name if it starts with an emoji
-              const cleanCareerName = /^[^\w\s]/.test(careerName) 
-                ? careerName.substring(1).trim() 
-                : careerName;
-              
-              result.careers.push({
-                emoji,
-                career: cleanCareerName,
-                matchPercentage
-              });
+            // Extract the trait name (first few words)
+            const words = trimmedLine.split(' ');
+            let traitName = '';
+            let description = '';
+            
+            if (words.length > 3) {
+              // Use first 2-3 words as the trait name
+              traitName = words.slice(0, 3).join(' ');
+              // Rest is the description
+              description = words.slice(3).join(' ');
+            } else {
+              // If very short, just use it as a trait name
+              traitName = trimmedLine;
+              description = 'This is one of your personality traits.';
             }
+            
+            // Clean the trait name if it starts with an emoji
+            const cleanTraitName = /^[^\w\s]/.test(traitName) 
+              ? traitName.substring(1).trim() 
+              : traitName;
+            
+            result.traits.push({
+              emoji,
+              trait: cleanTraitName,
+              description
+            });
           }
-        }
-        // If the line has at least 15 characters and doesn't have a percentage, it might be a trait
-        else if (trimmedLine.length > 15 && !trimmedLine.toLowerCase().includes('career')) {
-          // Try to find an emoji at the start
-          const emoji = /^[^\w\s]/.test(trimmedLine) ? trimmedLine.charAt(0) : '🧠';
-          
-          // Extract the trait name (first few words)
-          const words = trimmedLine.split(' ');
-          let traitName = '';
-          let description = '';
-          
-          if (words.length > 3) {
-            // Use first 2-3 words as the trait name
-            traitName = words.slice(0, 3).join(' ');
-            // Rest is the description
-            description = words.slice(3).join(' ');
-          } else {
-            // If very short, just use it as a trait name
-            traitName = trimmedLine;
-            description = 'This is one of your personality traits.';
-          }
-          
-          // Clean the trait name if it starts with an emoji
-          const cleanTraitName = /^[^\w\s]/.test(traitName) 
-            ? traitName.substring(1).trim() 
-            : traitName;
-          
-          result.traits.push({
-            emoji,
-            trait: cleanTraitName,
-            description
-          });
         }
       }
       
