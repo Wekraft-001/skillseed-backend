@@ -104,7 +104,12 @@ export class RewardsController {
     @CurrentUser() user: User,
     @Param('challengeId') challengeId: string
   ) {
-    return this.rewardsService.completeChallenge((user as any)._id, challengeId);
+    const badge = await this.rewardsService.completeChallenge((user as any)._id, challengeId);
+    return {
+      message: 'Challenge completed successfully',
+      badge,
+      isCompleted: true
+    };
   }
   
   @Post('complete-quiz/:quizId')
