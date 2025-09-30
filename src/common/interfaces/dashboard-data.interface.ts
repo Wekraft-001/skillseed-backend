@@ -24,6 +24,7 @@ export interface DashboardResponse extends DashboardData {
     summary?: DashboardSummary,
     currentUser: User,
     quizzes?: CareerQuiz[],
+    stars?: any[], // Adding stars field to the response
     // data?: {
     //     success: true,
     //     message: 'Dashboard data retrieved successfully',        
