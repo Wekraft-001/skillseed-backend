@@ -35,9 +35,14 @@ export class StudentDashboardService {
     ]);
 
     // Calculate summary statistics
+    // Count completed quizzes based on quiz stars (more accurate than the quiz.completed flag)
+    const quizStars = stars.filter(star => star.contentType === 'quiz');
+    const uniqueCompletedQuizIds = new Set(quizStars.map(star => star.contentId));
+    
     const summary = {
       totalBadges: badges.length,
-      completedQuizzes: quizzes.filter(q => q.completed).length
+      completedQuizzes: uniqueCompletedQuizIds.size,
+      totalStars: stars.reduce((total, star) => total + (star.starValue || 0), 0)
     };
 
     return {
@@ -238,12 +243,45 @@ export class StudentDashboardService {
       .find({ user: student._id })
       .sort({ createdAt: -1 });
 
-    this.logger.log(`Found ${content.length} educational content items for student ${student._id}`);
+    this.logger.log('Found ' + content.length + ' educational content items for student ' + student._id);
 
     if (!content.length) {
       const newRec = await this.generateRecommendations(student);
       content = newRec ? [newRec] : [];
-      this.logger.log(`Generated new educational content for student ${student._id}`);
+      this.logger.log('Generated new educational content for student ' + student._id);
+    } else {
+      // Ensure we're getting all educational content that has proper data
+      // Check if the first item has minimal content and if there are multiple items
+      if (content.length > 1 && 
+          (!content[0].books || content[0].books.length === 0) &&
+          (!content[0].games || content[0].games.length === 0) && 
+          (!content[0].videoUrl || content[0].videoUrl.length < 2)) {
+        
+        // If the latest content is minimal and older content exists, try to merge them
+        this.logger.log('Merging educational content for student ' + student._id);
+        
+        // Find the most comprehensive content
+        let bestContent = content[0];
+        for (const item of content) {
+          // Count the total elements across all content types
+          const totalElements = 
+            (item.videoUrl?.length || 0) + 
+            (item.books?.length || 0) + 
+            (item.games?.length || 0);
+          
+          const bestTotalElements = 
+            (bestContent.videoUrl?.length || 0) + 
+            (bestContent.books?.length || 0) + 
+            (bestContent.games?.length || 0);
+          
+          if (totalElements > bestTotalElements) {
+            bestContent = item;
+          }
+        }
+        
+        // Return the most comprehensive content
+        return [bestContent];
+      }
     }
 
     return content;
