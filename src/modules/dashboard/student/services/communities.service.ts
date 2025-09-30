@@ -28,7 +28,7 @@ export class StudentCommunitiesService {
     // this.logger.setContext('CommunityService');
   }
 
-  async getCommunities() {
+  async getCommunities(userId?: string) {
     try {
       const communities = await this.communityModel
         .find()
@@ -42,6 +42,9 @@ export class StudentCommunitiesService {
       return communities.map((community) => ({
         ...community.toObject(),
         memberCount: community.members.length,
+        hasJoined: userId ? community.members.some(memberId => 
+          memberId.toString() === userId.toString()
+        ) : false
       }));
     } catch (error) {
       this.logger.error(
@@ -52,7 +55,7 @@ export class StudentCommunitiesService {
     }
   }
 
-  async getCommunityDetails(communityId: string) {
+  async getCommunityDetails(communityId: string, userId?: string) {
     try {
       const community = await this.communityModel
         .findById(communityId)
@@ -67,6 +70,9 @@ export class StudentCommunitiesService {
       return {
         ...community.toObject(),
         memberCount: community.members.length,
+        hasJoined: userId ? community.members.some(memberId => 
+          memberId.toString() === userId.toString()
+        ) : false
       };
     } catch (error) {
       this.logger.error(

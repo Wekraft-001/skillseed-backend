@@ -72,6 +72,16 @@ export class RewardsService {
       );
     }
 
+    // Get star value based on content type
+    let starValue = 1; // Default value
+    if (contentType === 'video') {
+      starValue = 1; // 1 star per video
+    } else if (contentType === 'book') {
+      starValue = 20; // 20 stars per book
+    } else if (contentType === 'game') {
+      starValue = 1; // Default for games (not specified in requirements)
+    }
+
     // Check if star already exists
     let star = await this.starModel
       .findOne({
@@ -86,6 +96,7 @@ export class RewardsService {
       // Update existing star
       star.completed = true;
       star.completedAt = new Date();
+      star.starValue = starValue; // Update star value
       await star.save();
     } else {
       // Create new star
@@ -97,6 +108,7 @@ export class RewardsService {
         title,
         completed: true,
         completedAt: new Date(),
+        starValue: starValue, // Set star value
       });
       await star.save();
     }
@@ -129,6 +141,15 @@ export class RewardsService {
       })
       .exec();
 
+    // Check if stars already awarded for this project
+    const existingStar = await this.starModel
+      .findOne({
+        user: userId,
+        contentType: 'project',
+        contentId: challengeId,
+      })
+      .exec();
+
     if (badge) {
       // Update existing badge
       badge.isCompleted = true;
@@ -150,8 +171,25 @@ export class RewardsService {
 
       await badge.save();
 
+      // Award 15 stars for project completion if not already awarded
+      if (!existingStar) {
+        const star = new this.starModel({
+          user: userId,
+          contentType: 'project',
+          contentId: challengeId,
+          title: 'Project Completion: ' + (challenge.title || 'Challenge'),
+          completed: true,
+          completedAt: new Date(),
+          starValue: 15, // 15 stars per project
+        });
+        await star.save();
+      }
+
       // Check for special badges
       await this.checkAndAwardSpecialBadges(userId);
+      
+      // Check for tier badges based on total stars
+      await this.checkAndAwardTierBadges(userId);
 
       return badge;
     }
@@ -243,9 +281,18 @@ export class RewardsService {
     const stars = await this.starModel
       .find({ user: userId, completed: true })
       .exec();
-    const totalStars = stars.length;
+    
+    // Calculate total stars based on starValue
+    const totalStarValue = stars.reduce((total, star) => total + (star.starValue || 1), 0);
+    
+    // Count completed educational activities (only books, videos, games)
+    const educationalActivities = stars.filter(s => 
+      (s.contentType === 'video' || s.contentType === 'book' || s.contentType === 'game') && 
+      s.educationalContent
+    );
+    
     const completedActivities = new Set(
-      stars.map((s) => s.educationalContent.toString()),
+      educationalActivities.map((s) => s.educationalContent?.toString()).filter(Boolean)
     ).size;
 
     // Check for Bronze - Explorer badge (3+ activities)
@@ -260,7 +307,7 @@ export class RewardsService {
     }
 
     // Check for Silver - Rising Star badge (100+ stars)
-    if (totalStars >= 100) {
+    if (totalStarValue >= 100) {
       await this.awardTierBadge(
         userId,
         BadgeTier.SILVER,
@@ -271,7 +318,7 @@ export class RewardsService {
     }
 
     // Check for Gold - Power Player badge (200+ stars)
-    if (totalStars >= 200) {
+    if (totalStarValue >= 200) {
       await this.awardTierBadge(
         userId,
         BadgeTier.GOLD,
@@ -282,7 +329,7 @@ export class RewardsService {
     }
 
     // Check for Legendary - Ultimate Legend badge (300+ stars)
-    if (totalStars >= 300) {
+    if (totalStarValue >= 300) {
       await this.awardTierBadge(
         userId,
         BadgeTier.LEGENDARY,
@@ -357,9 +404,148 @@ export class RewardsService {
     }
   }
 
+  // Award stars for quiz completion (First-time signin)
+  async awardQuizCompletionStars(userId: string, quizId: string): Promise<Star> {
+    // Check if user has already been awarded stars for this quiz
+    let star = await this.starModel
+      .findOne({
+        user: userId,
+        contentType: 'quiz',
+        contentId: quizId,
+      })
+      .exec();
+
+    if (star) {
+      // Stars already awarded for this quiz
+      return star;
+    }
+
+    // Create new star entry
+    star = new this.starModel({
+      user: userId,
+      contentType: 'quiz',
+      contentId: quizId,
+      title: 'Career Quiz Completion',
+      completed: true,
+      completedAt: new Date(),
+      starValue: 5, // 5 stars per quiz
+    });
+    await star.save();
+
+    // Check for tier badges
+    await this.checkAndAwardTierBadges(userId);
+
+    return star;
+  }
+
+  // Award stars for community post
+  async awardCommunityPostStars(userId: string, postId: string): Promise<Star> {
+    // Check if user has already been awarded stars for this post
+    let star = await this.starModel
+      .findOne({
+        user: userId,
+        contentType: 'community',
+        contentId: postId,
+      })
+      .exec();
+
+    if (star) {
+      // Stars already awarded for this post
+      return star;
+    }
+
+    // Create new star entry
+    star = new this.starModel({
+      user: userId,
+      contentType: 'community',
+      contentId: postId,
+      title: 'Community Post',
+      completed: true,
+      completedAt: new Date(),
+      starValue: 5, // 5 stars per community post
+    });
+    await star.save();
+
+    // Check for tier badges
+    await this.checkAndAwardTierBadges(userId);
+
+    return star;
+  }
+
+  // Award stars for mentor session
+  async awardMentorSessionStars(userId: string, sessionId: string): Promise<Star> {
+    // Check if user has already been awarded stars for this session
+    let star = await this.starModel
+      .findOne({
+        user: userId,
+        contentType: 'mentor_session',
+        contentId: sessionId,
+      })
+      .exec();
+
+    if (star) {
+      // Stars already awarded for this session
+      return star;
+    }
+
+    // Create new star entry
+    star = new this.starModel({
+      user: userId,
+      contentType: 'mentor_session',
+      contentId: sessionId,
+      title: 'Mentor Session',
+      completed: true,
+      completedAt: new Date(),
+      starValue: 10, // 10 stars per mentor session
+    });
+    await star.save();
+
+    // Check for tier badges
+    await this.checkAndAwardTierBadges(userId);
+
+    return star;
+  }
+
+  // Award stars for mentor review
+  async awardMentorReviewStars(userId: string, reviewId: string): Promise<Star> {
+    // Check if user has already been awarded stars for this review
+    let star = await this.starModel
+      .findOne({
+        user: userId,
+        contentType: 'mentor_review',
+        contentId: reviewId,
+      })
+      .exec();
+
+    if (star) {
+      // Stars already awarded for this review
+      return star;
+    }
+
+    // Create new star entry
+    star = new this.starModel({
+      user: userId,
+      contentType: 'mentor_review',
+      contentId: reviewId,
+      title: 'Mentor Review',
+      completed: true,
+      completedAt: new Date(),
+      starValue: 5, // 5 stars per mentor review
+    });
+    await star.save();
+
+    // Check for tier badges
+    await this.checkAndAwardTierBadges(userId);
+
+    return star;
+  }
+
   async getStudentRewardsSummary(userId: string) {
     const stars = await this.starModel.find({ user: userId }).exec();
     const badges = await this.badgeModel.find({ user: userId }).exec();
+
+    // Calculate total star value (not just count)
+    const totalStarValue = stars.reduce((total, star) => total + (star.starValue || 1), 0);
 
     // Group badges by tier
     const badgesByTier = {
@@ -371,12 +557,33 @@ export class RewardsService {
     };
 
     return {
-      totalStars: stars.length,
+      totalStars: totalStarValue, // Return the sum of star values
       totalBadges: badges.length,
       starsByType: {
-        video: stars.filter((s) => s.contentType === 'video').length,
-        book: stars.filter((s) => s.contentType === 'book').length,
-        game: stars.filter((s) => s.contentType === 'game').length,
+        quiz: stars
+          .filter((s) => s.contentType === 'quiz')
+          .reduce((sum, star) => sum + (star.starValue || 5), 0),
+        video: stars
+          .filter((s) => s.contentType === 'video')
+          .reduce((sum, star) => sum + (star.starValue || 1), 0),
+        book: stars
+          .filter((s) => s.contentType === 'book')
+          .reduce((sum, star) => sum + (star.starValue || 20), 0),
+        game: stars
+          .filter((s) => s.contentType === 'game')
+          .reduce((sum, star) => sum + (star.starValue || 1), 0),
+        project: stars
+          .filter((s) => s.contentType === 'project')
+          .reduce((sum, star) => sum + (star.starValue || 15), 0),
+        community: stars
+          .filter((s) => s.contentType === 'community')
+          .reduce((sum, star) => sum + (star.starValue || 5), 0),
+        mentor_session: stars
+          .filter((s) => s.contentType === 'mentor_session')
+          .reduce((sum, star) => sum + (star.starValue || 10), 0),
+        mentor_review: stars
+          .filter((s) => s.contentType === 'mentor_review')
+          .reduce((sum, star) => sum + (star.starValue || 5), 0),
       },
       badgesByTier,
       badges: badges.map((badge) => ({
@@ -388,12 +595,13 @@ export class RewardsService {
         tier: badge.tier,
         icon: badge.icon,
         isCompleted: badge.isCompleted,
-        completedAt: badge['createdAt'] || badge['updatedAt'], // Use bracket notation to avoid type errors, or replace with a valid property if timestamps are not enabled
+        completedAt: badge['createdAt'] || badge['updatedAt'],
       })),
       stars: stars.map((star) => ({
         id: star._id,
         title: star.title,
         contentType: star.contentType,
+        starValue: star.starValue || 1, // Include star value in the response
         completedAt: star.completedAt,
       })),
     };
