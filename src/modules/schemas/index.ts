@@ -10,6 +10,7 @@ export * from './challenge.schema';
 export * from './completed-challenge.schema';
 export * from './category.schema';
 export * from './community.schema';
+export * from './post.schema';
 export * from './star.schema';
 export * from './student-activity.schema';
 export * from './student-achievement.schema';
