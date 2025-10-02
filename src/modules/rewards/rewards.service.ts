@@ -13,6 +13,8 @@ import {
   BadgeTier,
   Category,
   CategoryDocument,
+  CompletedChallenge,
+  CompletedChallengeDocument,
 } from '../schemas';
 
 @Injectable()
@@ -22,9 +24,11 @@ export class RewardsService {
     @InjectModel(Star.name) private starModel: Model<StarDocument>,
     @InjectModel(Challenge.name)
     private challengeModel: Model<ChallengeDocument>,
-    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>, // Add this line
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     @InjectModel(EducationalContent.name)
     private educationalContentModel: Model<EducationalContentDocument>,
+    @InjectModel(CompletedChallenge.name)
+    private completedChallengeModel: Model<CompletedChallengeDocument>,
   ) {}
 
   async getStarsForUser(userId: string): Promise<Star[]> {
@@ -130,6 +134,11 @@ export class RewardsService {
       throw new NotFoundException('Challenge not found');
     }
 
+    // Check if challenge is already marked as completed
+    const existingCompletion = await this.completedChallengeModel
+      .findOne({ userId, challengeId })
+      .exec();
+
     // Determine badge type based on challenge category
     const badgeType = this.getBadgeTypeFromChallenge(challenge);
 
@@ -149,6 +158,16 @@ export class RewardsService {
         contentId: challengeId,
       })
       .exec();
+
+    // Create CompletedChallenge record if it doesn't exist
+    if (!existingCompletion) {
+      const completedChallenge = new this.completedChallengeModel({
+        userId: userId,
+        challengeId: challengeId,
+        completedAt: new Date(),
+      });
+      await completedChallenge.save();
+    }
 
     if (badge) {
       // Update existing badge

@@ -15,6 +15,8 @@ import {
   Category,
   CompletedChallenge,
   CompletedChallengeSchema,
+  Post,
+  PostSchema,
 } from 'src/modules/schemas';
 import { LoggerModule } from 'src/common/logger/logger.module';
 import { AiModule } from 'src/modules/ai/ai.module';
@@ -26,6 +28,8 @@ import { ContentModule } from 'src/modules/content/content.module';
 import { StudentCommunitiesController } from '../controllers/communities.controller';
 import { StudentCommunitiesService } from '../services/communities.service';
 import { CompletedChallengesService } from '../services/completed-challenges.service';
+import { CommunityPostsController } from '../controllers/community-posts.controller';
+import { PostsService } from '../services/posts.service';
 import { RewardsModule } from 'src/modules/rewards/rewards.module';
 
 @Module({
@@ -38,6 +42,7 @@ import { RewardsModule } from 'src/modules/rewards/rewards.module';
       { name: Community.name, schema: CommunitySchema },
       { name: Category.name, schema: CategorySchema },
       { name: CompletedChallenge.name, schema: CompletedChallengeSchema },
+      { name: Post.name, schema: PostSchema },
     ]),
     LoggerModule,
     AiModule,
@@ -48,12 +53,14 @@ import { RewardsModule } from 'src/modules/rewards/rewards.module';
     StudentDashboardController,
     StudentChallengesController,
     StudentCommunitiesController,
+    CommunityPostsController,
   ],
   providers: [
     StudentDashboardService,
     StudentChallengesService,
     StudentCommunitiesService,
     CompletedChallengesService,
+    PostsService,
   ],
   exports: [StudentDashboardService],
 })

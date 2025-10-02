@@ -680,13 +680,31 @@ Format your overall response in a clear, encouraging manner suitable for a curio
       .exec();
 
     try {
+      // Mark the quiz as completed
+      quiz.completed = true;
+      quiz.userAnswers = dto.answers;
+      
+      // Save the updated quiz
+      await quiz.save();
+      
       // Award stars for quiz completion
       this.logger.log(`Awarding stars for quiz completion to user ${result.userId} for quiz ${dto.quizId}`);
       await this.rewardsService.awardQuizCompletionStars(result.userId, dto.quizId);
       this.logger.log(`Successfully awarded stars for quiz ${dto.quizId}`);
+      
+      // Ensure the quiz is linked to the user
+      await this.userModel.findByIdAndUpdate(
+        result.userId,
+        { 
+          $addToSet: { quizzes: dto.quizId },
+          initialQuizId: quiz._id  // Set as initial quiz if not set
+        },
+        { new: true }
+      );
+      
     } catch (error) {
       // Log the error but don't fail the whole operation
-      this.logger.error(`Failed to award stars for quiz ${dto.quizId}: ${error.message}`);
+      this.logger.error(`Failed to update quiz completion status: ${error.message}`);
     }
       
     // Include user details in the response
@@ -780,13 +798,11 @@ Format your overall response in a clear, encouraging manner suitable for a curio
       }
       
       if (!latestQuiz) {
-        this.logger.error(`No quiz found for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
-        throw new BadRequestException('No quiz found');
-      }
-      
-      if (!latestQuiz.completed || !latestQuiz.analysis) {
-        this.logger.error(`Quiz ${latestQuiz._id} found but not completed or missing analysis. Completed: ${latestQuiz.completed}, Has analysis: ${!!latestQuiz.analysis}`);
-        throw new BadRequestException('Quiz is not complete or missing analysis');
+        this.logger.warn(`No quiz found for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}, but will still generate generic content`);
+        // Continue without a quiz, we'll generate generic content instead of failing
+      } else if (!latestQuiz.completed || !latestQuiz.analysis) {
+        this.logger.warn(`Quiz ${latestQuiz._id} found but not completed or missing analysis. Completed: ${latestQuiz.completed}, Has analysis: ${!!latestQuiz.analysis}`);
+        // Continue without analysis, we'll generate generic content
       }
     } catch (error) {
       this.logger.error(`Error finding quiz: ${error.message}`);
@@ -795,11 +811,27 @@ Format your overall response in a clear, encouraging manner suitable for a curio
     
     this.logger.log(`Using quiz ${latestQuiz._id} to generate educational content`);
 
-    const prompt = `Generate personalized educational content for a ${user.age}-year-old child named ${user.firstName}.
+    let prompt;
+    
+    if (latestQuiz && latestQuiz.completed && latestQuiz.analysis) {
+      // If we have a completed quiz with analysis, use it
+      prompt = `Generate personalized educational content for a ${user.age}-year-old child named ${user.firstName}.
     
 Based on the quiz analysis: ${latestQuiz.analysis}, create a custom learning plan with:
 
 1. Videos: Suggest 3-5 educational YouTube videos. Include title and URL.
+2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, and educational theme.
+
+Format your response as a JSON object with two keys:
+- "video": array of {title, url} objects
+- "books": array of {title, author, level, theme} objects - ONLY FREE AND OPEN SOURCE BOOKS`;
+    } else {
+      // If we don't have a completed quiz with analysis, generate generic content
+      prompt = `Generate age-appropriate educational content for a ${user.age}-year-old child named ${user.firstName}.
+      
+Create a general learning plan with:
+
+1. Videos: Suggest 3-5 educational YouTube videos about basic subjects like math, science, reading. Include title and URL.
 2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, and educational theme.
 
 Format your response as a JSON object with two keys:
@@ -817,6 +849,7 @@ For example:
     {"title": "The Wonderful Wizard of Oz", "author": "L. Frank Baum", "level": "Intermediate", "theme": "Adventure"}
   ]
 }`;
+    }
 
     const response = await this.openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
@@ -828,18 +861,90 @@ For example:
       response.choices[0].message.content || '{}',
     );
 
-    const educationalContent = await this.eduContentModel.create({
-      user: user._id,
-      videoUrl: JsonEducationContent.video || [],
-      books: JsonEducationContent.books || [],
-      games: [] // Empty games array since we're removing games
-    });
-
-    return educationalContent;
+    try {
+      // Verify we have content before creating
+      if (!JsonEducationContent.video || !JsonEducationContent.books || 
+          (!JsonEducationContent.video.length && !JsonEducationContent.books.length)) {
+        this.logger.warn('AI response did not contain expected video or book content, using fallback content');
+        
+        // Create fallback content
+        const fallbackContent = {
+          user: user._id,
+          videoUrl: [
+            { 
+              title: "Introduction to Math for Kids", 
+              url: "https://www.youtube.com/watch?v=aUJ-4oD9Oe8" 
+            },
+            { 
+              title: "Basic Science Concepts for Kids", 
+              url: "https://www.youtube.com/watch?v=6ybBuTETr3U" 
+            }
+          ],
+          books: [
+            { 
+              title: "A Child's Garden of Verses", 
+              author: "Robert Louis Stevenson", 
+              level: "Elementary",
+              theme: "Poetry"
+            },
+            { 
+              title: "The Wonderful Wizard of Oz", 
+              author: "L. Frank Baum", 
+              level: "Elementary",
+              theme: "Adventure"
+            }
+          ],
+          games: [
+            { 
+              name: "PBS Kids Games", 
+              url: "https://pbskids.org/games", 
+              skill: "Various" 
+            }
+          ]
+        };
+        
+        // Save the fallback content
+        const savedFallbackContent = await this.eduContentModel.create(fallbackContent);
+        
+        // Update the user to reference this content
+        await this.userModel.findByIdAndUpdate(
+          user._id,
+          { $addToSet: { educationalContents: savedFallbackContent._id } }
+        );
+        
+        return savedFallbackContent;
+      }
+      
+      // Create with AI-generated content
+      const educationalContent = await this.eduContentModel.create({
+        user: user._id,
+        videoUrl: JsonEducationContent.video || [],
+        books: JsonEducationContent.books || [],
+        games: JsonEducationContent.games || [] // Include games if available
+      });
+      
+      // Update the user to reference this content
+      await this.userModel.findByIdAndUpdate(
+        user._id,
+        { $addToSet: { educationalContents: educationalContent._id } }
+      );
+      
+      return educationalContent;
+    } catch (error) {
+      this.logger.error('Error creating educational content: ' + error.message, error.stack);
+      
+      // If there was an error, return a minimal content object
+      return await this.eduContentModel.create({
+        user: user._id,
+        videoUrl: [{ title: "Learning Basics", url: "https://www.youtube.com/watch?v=RMJHbm5LfKU" }],
+        books: [],
+        games: []
+      });
+    }
   }
 
   private async getLatestQuiz(userId: string, quizId?: string): Promise<CareerQuiz | null> {
-    this.logger.log(`Getting quiz for user ${userId}${quizId ? ` with quizId ${quizId}` : ''}`);
+    this.logger.log('Getting quiz for user ' + userId + (quizId ? ' with quizId ' + quizId : ''));
     
     // If quizId is provided, try to find that specific quiz first
     if (quizId) {
@@ -850,17 +955,17 @@ For example:
           .exec();
         
         if (specificQuiz) {
-          this.logger.log(`Found quiz with ID ${quizId}, owned by user ${specificQuiz.user}, requesting user: ${userId}`);
+          this.logger.log('Found quiz with ID ' + quizId + ', owned by user ' + specificQuiz.user + ', requesting user: ' + userId);
           
           // Check if it belongs to the user
           if (specificQuiz.user.toString() === userId.toString()) {
-            this.logger.log(`Quiz ${quizId} belongs to user ${userId}, completed: ${specificQuiz.completed}, has analysis: ${!!specificQuiz.analysis}`);
+            this.logger.log('Quiz ' + quizId + ' belongs to user ' + userId + ', completed: ' + specificQuiz.completed + ', has analysis: ' + !!specificQuiz.analysis);
             return specificQuiz;
           } else {
-            this.logger.warn(`Quiz ${quizId} found but belongs to user ${specificQuiz.user}, not ${userId}`);
+            this.logger.warn('Quiz ' + quizId + ' found but belongs to user ' + specificQuiz.user + ', not ' + userId);
           }
         } else {
-          this.logger.warn(`No quiz found with ID ${quizId}`);
+          this.logger.warn('No quiz found with ID ' + quizId);
         }
       } catch (error) {
         this.logger.error(`Error finding quiz by ID ${quizId}: ${error.message}`);

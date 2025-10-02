@@ -13,6 +13,8 @@ import {
   UserSchema,
   Category,
   CategorySchema,
+  CompletedChallenge,
+  CompletedChallengeSchema,
 } from '../schemas';
 import { RewardsService } from './rewards.service';
 import { RewardsController } from './rewards.controller';
@@ -26,6 +28,7 @@ import { RewardsController } from './rewards.controller';
       { name: Category.name, schema: CategorySchema },
       { name: EducationalContent.name, schema: EducationalContentSchema },
       { name: User.name, schema: UserSchema },
+      { name: CompletedChallenge.name, schema: CompletedChallengeSchema },
     ]),
   ],
   providers: [RewardsService],
