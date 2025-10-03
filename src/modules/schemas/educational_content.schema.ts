@@ -7,11 +7,11 @@ export type EducationalContentDocument = EducationalContent & Document;
 @Schema({ timestamps: true })
 export class EducationalContent {
   @Prop({
-    type: [{ title: String, url: String }],
+    type: [{ title: String, url: String, description: String, duration: String, tag: String }],
     default: [],
     index: true
   })
-  videoUrl: { title: string; url: string }[];
+  videoUrl: { title: string; url: string; description: string; duration: string; tag: string }[];
 
   @Prop({
     type: [
@@ -20,6 +20,7 @@ export class EducationalContent {
         author: String,
         level: String,
         theme: String,
+        url: String,
       },
     ],
     default: [],
@@ -30,6 +31,7 @@ export class EducationalContent {
     author: string;
     level: string;
     theme: string;
+    url: string;
   }>;
 
   @Prop({
@@ -38,6 +40,7 @@ export class EducationalContent {
         name: String,
         url: String,
         skill: String,
+        description: String,
       },
     ],
     default: [],
@@ -47,6 +50,7 @@ export class EducationalContent {
     name: string;
     url: string;
     skill: string;
+    description: string;
   }>;
 
   @Prop({ enum: ['video', 'book', 'game'], required: false, index: true })

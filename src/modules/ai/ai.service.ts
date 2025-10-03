@@ -812,34 +812,41 @@ Format your overall response in a clear, encouraging manner suitable for a curio
     
 Based on the quiz analysis: ${latestQuiz.analysis}, create a custom learning plan with:
 
-1. Videos: Suggest 3-5 educational YouTube videos. Include title and URL.
-2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, and educational theme.
+1. Videos: Suggest 3-5 educational YouTube videos. Include title, URL, short description (1-2 sentences), duration (e.g., "5 minutes", "10 minutes"), and educational tag (e.g., "Math", "Science", "Reading").
+2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, educational theme, and the direct URL where the book can be accessed.
+3. Games: Suggest 2-3 educational games with name, URL, skill focus, and a brief description of what the game teaches.
 
-Format your response as a JSON object with two keys:
-- "video": array of {title, url} objects
-- "books": array of {title, author, level, theme} objects - ONLY FREE AND OPEN SOURCE BOOKS`;
+Format your response as a JSON object with three keys:
+- "video": array of {title, url, description, duration, tag} objects
+- "books": array of {title, author, level, theme, url} objects - ONLY FREE AND OPEN SOURCE BOOKS
+- "games": array of {name, url, skill, description} objects`;
     } else {
       // If we don't have a completed quiz with analysis, generate generic content
       prompt = `Generate age-appropriate educational content for a ${user.age}-year-old child named ${user.firstName}.
       
 Create a general learning plan with:
 
-1. Videos: Suggest 3-5 educational YouTube videos about basic subjects like math, science, reading. Include title and URL.
-2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, and educational theme.
+1. Videos: Suggest 3-5 educational YouTube videos about basic subjects like math, science, reading. Include title, URL, short description (1-2 sentences), duration (e.g., "5 minutes", "10 minutes"), and educational tag (e.g., "Math", "Science", "Reading").
+2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, educational theme, and the direct URL where the book can be accessed.
+3. Games: Suggest 2-3 educational games with name, URL, skill focus, and a brief description of what the game teaches.
 
-Format your response as a JSON object with two keys:
-- "video": array of {title, url} objects
-- "books": array of {title, author, level, theme} objects - ONLY FREE AND OPEN SOURCE BOOKS
+Format your response as a JSON object with three keys:
+- "video": array of {title, url, description, duration, tag} objects
+- "books": array of {title, author, level, theme, url} objects - ONLY FREE AND OPEN SOURCE BOOKS
+- "games": array of {name, url, skill, description} objects
 
 For example:
 {
   "video": [
-    {"title": "Introduction to Fractions", "url": "https://www.youtube.com/watch?v=example1"},
-    {"title": "The Water Cycle", "url": "https://www.youtube.com/watch?v=example2"}
+    {"title": "Introduction to Fractions", "url": "https://www.youtube.com/watch?v=example1", "description": "Learn basic fraction concepts with visual examples", "duration": "8 minutes", "tag": "Math"},
+    {"title": "The Water Cycle", "url": "https://www.youtube.com/watch?v=example2", "description": "Understand how water moves through our environment", "duration": "12 minutes", "tag": "Science"}
   ],
   "books": [
-    {"title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "level": "Intermediate", "theme": "Imagination"},
-    {"title": "The Wonderful Wizard of Oz", "author": "L. Frank Baum", "level": "Intermediate", "theme": "Adventure"}
+    {"title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "level": "Intermediate", "theme": "Imagination", "url": "https://www.gutenberg.org/ebooks/11"},
+    {"title": "The Wonderful Wizard of Oz", "author": "L. Frank Baum", "level": "Intermediate", "theme": "Adventure", "url": "https://www.gutenberg.org/ebooks/55"}
+  ],
+  "games": [
+    {"name": "Math Playground", "url": "https://www.mathplayground.com", "skill": "Mathematics", "description": "Interactive math games covering addition, subtraction, and problem solving"}
   ]
 }`;
     }
@@ -856,9 +863,9 @@ For example:
 
     try {
       // Verify we have content before creating
-      if (!JsonEducationContent.video || !JsonEducationContent.books || 
-          (!JsonEducationContent.video.length && !JsonEducationContent.books.length)) {
-        this.logger.warn('AI response did not contain expected video or book content, using fallback content');
+      if (!JsonEducationContent.video || !JsonEducationContent.books || !JsonEducationContent.games ||
+          (!JsonEducationContent.video.length && !JsonEducationContent.books.length && !JsonEducationContent.games.length)) {
+        this.logger.warn('AI response did not contain expected video, book, or game content, using fallback content');
         
         // Create fallback content
         const fallbackContent = {
@@ -866,11 +873,17 @@ For example:
           videoUrl: [
             { 
               title: "Introduction to Math for Kids", 
-              url: "https://www.youtube.com/watch?v=aUJ-4oD9Oe8" 
+              url: "https://www.youtube.com/watch?v=aUJ-4oD9Oe8",
+              description: "Fun and engaging math concepts for young learners",
+              duration: "10 minutes",
+              tag: "Math"
             },
             { 
               title: "Basic Science Concepts for Kids", 
-              url: "https://www.youtube.com/watch?v=6ybBuTETr3U" 
+              url: "https://www.youtube.com/watch?v=6ybBuTETr3U",
+              description: "Explore fascinating science topics in simple terms",
+              duration: "8 minutes", 
+              tag: "Science"
             }
           ],
           books: [
@@ -878,20 +891,23 @@ For example:
               title: "A Child's Garden of Verses", 
               author: "Robert Louis Stevenson", 
               level: "Elementary",
-              theme: "Poetry"
+              theme: "Poetry",
+              url: "https://www.gutenberg.org/ebooks/25609"
             },
             { 
               title: "The Wonderful Wizard of Oz", 
               author: "L. Frank Baum", 
               level: "Elementary",
-              theme: "Adventure"
+              theme: "Adventure",
+              url: "https://www.gutenberg.org/ebooks/55"
             }
           ],
           games: [
             { 
               name: "PBS Kids Games", 
               url: "https://pbskids.org/games", 
-              skill: "Various" 
+              skill: "Various",
+              description: "Educational games covering math, reading, and science concepts"
             }
           ]
         };
@@ -929,7 +945,13 @@ For example:
       // If there was an error, return a minimal content object
       return await this.eduContentModel.create({
         user: user._id,
-        videoUrl: [{ title: "Learning Basics", url: "https://www.youtube.com/watch?v=RMJHbm5LfKU" }],
+        videoUrl: [{ 
+          title: "Learning Basics", 
+          url: "https://www.youtube.com/watch?v=RMJHbm5LfKU",
+          description: "Basic educational content for learning",
+          duration: "5 minutes",
+          tag: "General"
+        }],
         books: [],
         games: []
       });
