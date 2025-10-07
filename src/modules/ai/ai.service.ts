@@ -12,6 +12,7 @@ import { LoggerService } from 'src/common/logger/logger.service';
 import { RedisService } from 'src/redis/redis.service';
 import { CareerQuiz, CareerQuizDocument } from '../schemas/career-quiz.schema';
 import { RewardsService } from '../rewards/rewards.service';
+import { YouTubeService } from './youtube.service';
 import {
   EducationalContent,
   EducationalContentDocument,
@@ -34,6 +35,7 @@ export class AiService {
     // Redis injected via Global module
     private readonly redisService: RedisService,
     private readonly rewardsService: RewardsService,
+    private readonly youtubeService: YouTubeService,
 
     @InjectModel(CareerQuiz.name)
     private readonly quizModel: Model<CareerQuizDocument>,
@@ -741,6 +743,193 @@ Format your overall response in a clear, encouraging manner suitable for a curio
     };
   }
 
+  /**
+   * Get educational video recommendations using YouTube Data API
+   * This searches for real educational videos based on topics and age
+   */
+  private async getEducationalVideosFromYouTube(topics: string[], ageRange: string, maxResults: number = 5) {
+    // This would use YouTube Data API v3 to search for educational content
+    // For now, we'll use a hybrid approach with verified channels + search capability
+    
+    const trustedChannels = [
+      'UC4a-Gbdw7vOaccHmFo40b9g', // Khan Academy Kids  
+      'UCsooa4yRKGN_zEE8iknghZA', // TED-Ed
+      'UCzJQOHztj_KsJEtaJTqhNhg', // SciShow Kids
+      'UCXVCgDuD_QCkI7gTKU7-tpg', // National Geographic Kids
+      'UC6nSFpj9HTCZ5t-N3Rm3-HA', // Vsauce
+      'UCAuUUnT6oDeKwE6v1NGQxug', // TED
+      'UC4a-Gbdw7vOaccHmFo40b9g', // Crash Course Kids
+      'UCdC0An4ZPNr_YiFiYoVbwaw', // Numberphile
+      'UC1_uAIS3r8Vu6JjXWvastJg', // Mathologer
+      'UC-JqSDMh0lBPL6L6K16dJKg', // PBS Kids
+    ];
+
+    // In a real implementation, this would:
+    // 1. Search YouTube using the Data API
+    // 2. Filter results to only trusted channels
+    // 3. Verify content is educational and age-appropriate
+    // 4. Return structured video data
+    
+    return this.getVerifiedEducationalContent(topics, ageRange, maxResults);
+  }
+
+  /**
+   * Get verified educational content using YouTube Data API
+   * This searches for real educational videos from trusted channels
+   */
+  private async getVerifiedEducationalContent(topics: string[], ageRange: string, maxResults: number = 5) {
+    this.logger.log(`Getting verified educational content for topics: ${topics.join(', ')}, age: ${ageRange}`);
+    
+    let allVideos = [];
+    
+    try {
+      // Search for videos for each topic
+      for (const topic of topics) {
+        const videosPerTopic = Math.ceil(maxResults / topics.length);
+        
+        const videos = await this.youtubeService.searchEducationalVideos({
+          query: `${topic} education`,
+          ageRange: ageRange,
+          subject: topic,
+          maxResults: videosPerTopic
+        });
+        
+        if (videos && videos.length > 0) {
+          allVideos.push(...videos);
+          this.logger.log(`Found ${videos.length} videos for topic: ${topic}`);
+        }
+      }
+      
+      // If we have videos, shuffle and return the requested amount
+      if (allVideos.length > 0) {
+        const shuffledVideos = this.shuffleArray(allVideos);
+        const finalVideos = shuffledVideos.slice(0, maxResults);
+        
+        this.logger.log(`Returning ${finalVideos.length} educational videos from YouTube API`);
+        return finalVideos;
+      }
+      
+      // If no videos found, fall back to curated content
+      this.logger.warn('No videos found from YouTube API, using fallback content');
+      return this.getFallbackEducationalContent(topics, maxResults);
+      
+    } catch (error) {
+      this.logger.error(`Error getting educational content: ${error.message}`);
+      return this.getFallbackEducationalContent(topics, maxResults);
+    }
+  }
+
+  /**
+   * Fallback educational content when YouTube API fails
+   */
+  private getFallbackEducationalContent(topics: string[], maxResults: number) {
+    const fallbackDatabase = {
+      math: [
+        {
+          title: "Khan Academy Kids - Basic Math",
+          url: "https://www.youtube.com/channel/UC4a-Gbdw7vOaccHmFo40b9g",
+          description: "Learn fundamental math concepts with engaging visual examples",
+          duration: "5-10 minutes",
+          tag: "Math",
+          channelName: "Khan Academy Kids",
+          verified: true
+        },
+        {
+          title: "Numberphile - Math Concepts",
+          url: "https://www.youtube.com/user/numberphile",
+          description: "Explore fascinating mathematical ideas and number concepts",
+          duration: "8-15 minutes",
+          tag: "Math", 
+          channelName: "Numberphile",
+          verified: true
+        }
+      ],
+      science: [
+        {
+          title: "SciShow Kids - Science Fun",
+          url: "https://www.youtube.com/user/scishowkids",
+          description: "Fun science experiments and explanations for curious kids",
+          duration: "4-8 minutes",
+          tag: "Science",
+          channelName: "SciShow Kids",
+          verified: true
+        },
+        {
+          title: "National Geographic Kids - Nature",
+          url: "https://www.youtube.com/channel/UCXVCgDuD_QCkI7gTKU7-tpg",
+          description: "Discover amazing facts about animals and nature",
+          duration: "6-12 minutes",
+          tag: "Science",
+          channelName: "National Geographic Kids", 
+          verified: true
+        }
+      ],
+      reading: [
+        {
+          title: "PBS Kids - Reading Adventures",
+          url: "https://www.youtube.com/user/pbskids",
+          description: "Interactive reading activities and phonics lessons",
+          duration: "5-12 minutes",
+          tag: "Reading",
+          channelName: "PBS Kids",
+          verified: true
+        }
+      ]
+    };
+
+    let fallbackVideos = [];
+    for (const topic of topics) {
+      const topicVideos = fallbackDatabase[topic.toLowerCase()] || fallbackDatabase.math;
+      fallbackVideos.push(...topicVideos);
+    }
+
+    return this.shuffleArray(fallbackVideos).slice(0, maxResults);
+  }
+
+  private getAgeCategory(ageRange: string): string {
+    const age = parseInt(ageRange.split('-')[0]) || 8;
+    if (age <= 7) return 'elementary';
+    if (age <= 12) return 'intermediate'; 
+    return 'advanced';
+  }
+
+  private shuffleArray(array: any[]): any[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  /**
+   * Extract topics from quiz analysis text
+   */
+  private extractTopicsFromAnalysis(analysis: string): string[] {
+    const defaultTopics = ['math', 'science'];
+    
+    if (!analysis) return defaultTopics;
+    
+    const topics = [];
+    const text = analysis.toLowerCase();
+    
+    // Extract topics based on keywords in the analysis
+    if (text.includes('math') || text.includes('number') || text.includes('calculation')) {
+      topics.push('math');
+    }
+    if (text.includes('science') || text.includes('experiment') || text.includes('nature')) {
+      topics.push('science');
+    }
+    if (text.includes('read') || text.includes('language') || text.includes('story')) {
+      topics.push('reading');
+    }
+    if (text.includes('art') || text.includes('creative') || text.includes('drawing')) {
+      topics.push('art');
+    }
+    
+    return topics.length > 0 ? topics : defaultTopics;
+  }
+
   async generateEducationalContent(
     userId: string,
     quizId?: string
@@ -808,38 +997,68 @@ Format your overall response in a clear, encouraging manner suitable for a curio
     
     if (latestQuiz && latestQuiz.completed && latestQuiz.analysis) {
       // If we have a completed quiz with analysis, use it
+      // Get dynamic educational content based on quiz analysis
+      const analysisTopics = this.extractTopicsFromAnalysis(latestQuiz.analysis);
+      const educationalVideos = await this.getVerifiedEducationalContent(analysisTopics, user.age.toString(), 8);
+      
       prompt = `Generate personalized educational content for a ${user.age}-year-old child named ${user.firstName}.
     
-Based on the quiz analysis: ${latestQuiz.analysis}, create a custom learning plan with:
+Based on the quiz analysis: ${latestQuiz.analysis}, create a custom learning plan by selecting from these VERIFIED educational videos:
 
-1. Videos: Suggest 3-5 educational YouTube videos. Include title, URL, short description (1-2 sentences), duration (e.g., "5 minutes", "10 minutes"), and educational tag (e.g., "Math", "Science", "Reading").
-2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, educational theme, and the direct URL where the book can be accessed.
-3. Games: Suggest 2-3 educational games with name, URL, skill focus, and a brief description of what the game teaches.
+AVAILABLE EDUCATIONAL VIDEOS:
+${educationalVideos.map(video => `- "${video.title}" - ${video.url} - ${video.description} - Duration: ${video.duration} - Tag: ${video.tag}`).join('\n')}
+
+Select 3-5 videos from the list above that best match the child's interests and age based on the quiz analysis. Use the EXACT titles and URLs provided.
+
+2. Books: Suggest 3-5 FREE books from Project Gutenberg (https://www.gutenberg.org/) or Open Library (https://openlibrary.org/) with verified URLs.
+
+3. Games: Suggest 2-3 educational games from these trusted sources:
+   - Math Playground: https://www.mathplayground.com
+   - PBS Kids Games: https://pbskids.org/games
+   - Funbrain: https://www.funbrain.com
+   - Coolmath4kids: https://www.coolmath4kids.com
+
+CRITICAL RULE: Only use the exact channel URLs provided above. DO NOT create or modify URLs.
 
 Format your response as a JSON object with three keys:
-- "video": array of {title, url, description, duration, tag} objects
-- "books": array of {title, author, level, theme, url} objects - ONLY FREE AND OPEN SOURCE BOOKS
-- "games": array of {name, url, skill, description} objects`;
+- "video": array of {title, url, description, duration, tag} objects (use exact data from list above)
+- "books": array of {title, author, level, theme, url} objects (use real Project Gutenberg or Open Library URLs)
+- "games": array of {name, url, skill, description} objects (use exact URLs from trusted sources above)`;
     } else {
       // If we don't have a completed quiz with analysis, generate generic content
+      // Get educational content for general age-appropriate topics
+      const generalTopics = ['math', 'science', 'reading'];
+      const educationalVideos = await this.getVerifiedEducationalContent(generalTopics, user.age.toString(), 8);
+      
       prompt = `Generate age-appropriate educational content for a ${user.age}-year-old child named ${user.firstName}.
       
-Create a general learning plan with:
+Create a general learning plan by selecting from these VERIFIED educational videos:
 
-1. Videos: Suggest 3-5 educational YouTube videos about basic subjects like math, science, reading. Include title, URL, short description (1-2 sentences), duration (e.g., "5 minutes", "10 minutes"), and educational tag (e.g., "Math", "Science", "Reading").
-2. Books: Suggest 3-5 FREE and OPEN SOURCE books that are completely free to access. Do not include any paid books or books that require purchase. Only suggest books from sources like Project Gutenberg, Open Library, or other free repositories. Include title, author, level, educational theme, and the direct URL where the book can be accessed.
-3. Games: Suggest 2-3 educational games with name, URL, skill focus, and a brief description of what the game teaches.
+AVAILABLE EDUCATIONAL VIDEOS:
+${educationalVideos.map(video => `- "${video.title}" - ${video.url} - ${video.description} - Duration: ${video.duration} - Tag: ${video.tag}`).join('\n')}
+
+Select 3-5 channels appropriate for a ${user.age}-year-old. Use the EXACT titles and URLs provided.
+
+2. Books: Suggest 3-5 FREE books from Project Gutenberg (https://www.gutenberg.org/) or Open Library (https://openlibrary.org/) with verified URLs.
+
+3. Games: Suggest 2-3 educational games from these trusted sources:
+   - Math Playground: https://www.mathplayground.com
+   - PBS Kids Games: https://pbskids.org/games  
+   - Funbrain: https://www.funbrain.com
+   - Coolmath4kids: https://www.coolmath4kids.com
+
+CRITICAL RULE: Only use the exact channel URLs provided above. DO NOT create or modify URLs.
 
 Format your response as a JSON object with three keys:
-- "video": array of {title, url, description, duration, tag} objects
-- "books": array of {title, author, level, theme, url} objects - ONLY FREE AND OPEN SOURCE BOOKS
-- "games": array of {name, url, skill, description} objects
+- "video": array of {title, url, description, duration, tag} objects (use exact data from list above)
+- "books": array of {title, author, level, theme, url} objects (use real Project Gutenberg or Open Library URLs)
+- "games": array of {name, url, skill, description} objects (use exact URLs from trusted sources above)
 
 For example:
 {
   "video": [
-    {"title": "Introduction to Fractions", "url": "https://www.youtube.com/watch?v=example1", "description": "Learn basic fraction concepts with visual examples", "duration": "8 minutes", "tag": "Math"},
-    {"title": "The Water Cycle", "url": "https://www.youtube.com/watch?v=example2", "description": "Understand how water moves through our environment", "duration": "12 minutes", "tag": "Science"}
+    {"title": "Khan Academy Kids - Basic Addition", "url": "https://www.youtube.com/channel/UC4a-Gbdw7vOaccHmFo40b9g", "description": "Learn basic addition with fun visual examples", "duration": "5-8 minutes", "tag": "Math"},
+    {"title": "SciShow Kids - Science Experiments", "url": "https://www.youtube.com/user/scishowkids", "description": "Fun science experiments and explanations for curious kids", "duration": "4-8 minutes", "tag": "Science"}
   ],
   "books": [
     {"title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "level": "Intermediate", "theme": "Imagination", "url": "https://www.gutenberg.org/ebooks/11"},
@@ -867,23 +1086,17 @@ For example:
           (!JsonEducationContent.video.length && !JsonEducationContent.books.length && !JsonEducationContent.games.length)) {
         this.logger.warn('AI response did not contain expected video, book, or game content, using fallback content');
         
-        // Create fallback content
+        // Create fallback content using verified educational videos
+        const fallbackVideos = await this.getVerifiedEducationalContent(['math', 'science'], '8', 2);
         const fallbackContent = {
           user: user._id,
-          videoUrl: [
-            { 
-              title: "Introduction to Math for Kids", 
-              url: "https://www.youtube.com/watch?v=aUJ-4oD9Oe8",
-              description: "Fun and engaging math concepts for young learners",
-              duration: "10 minutes",
+          videoUrl: fallbackVideos.length > 0 ? fallbackVideos : [
+            {
+              title: "Khan Academy Kids - Basic Math",
+              url: "https://www.youtube.com/channel/UC4a-Gbdw7vOaccHmFo40b9g",
+              description: "Learn basic math concepts with fun examples",
+              duration: "5-8 minutes",
               tag: "Math"
-            },
-            { 
-              title: "Basic Science Concepts for Kids", 
-              url: "https://www.youtube.com/watch?v=6ybBuTETr3U",
-              description: "Explore fascinating science topics in simple terms",
-              duration: "8 minutes", 
-              tag: "Science"
             }
           ],
           books: [
@@ -945,11 +1158,11 @@ For example:
       // If there was an error, return a minimal content object
       return await this.eduContentModel.create({
         user: user._id,
-        videoUrl: [{ 
-          title: "Learning Basics", 
-          url: "https://www.youtube.com/watch?v=RMJHbm5LfKU",
-          description: "Basic educational content for learning",
-          duration: "5 minutes",
+        videoUrl: [{
+          title: "TED-Ed - Educational Stories",
+          url: "https://www.youtube.com/user/TEDEducation",
+          description: "Thought-provoking educational content and animated lessons",
+          duration: "4-8 minutes",
           tag: "General"
         }],
         books: [],

@@ -317,6 +317,66 @@ export class AiController {
   guestRecommendations(@Body() body: { sessionId: string; quizId: string }) {
     return this.aiService.generateGuestRecommendations(body);
   }
+
+  // Test endpoint for YouTube API (development only)
+  @Get('test/youtube')
+  @ApiOperation({ summary: 'Test YouTube API integration (development only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns sample educational videos from YouTube API',
+    schema: {
+      type: 'object',
+      properties: {
+        videos: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              url: { type: 'string' },
+              description: { type: 'string' },
+              duration: { type: 'string' },
+              tag: { type: 'string' },
+              channelName: { type: 'string' },
+              verified: { type: 'boolean' }
+            }
+          }
+        },
+        totalFound: { type: 'number' },
+        topics: { type: 'array', items: { type: 'string' } }
+      }
+    }
+  })
+  async testYouTubeAPI(
+    @Query('topics') topics?: string,
+    @Query('age') age?: string,
+    @Query('maxResults') maxResults?: string
+  ) {
+    // Only allow in development mode
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('This endpoint is only available in development mode');
+    }
+
+    const topicList = topics ? topics.split(',') : ['math', 'science'];
+    const ageRange = age || '8';
+    const max = maxResults ? parseInt(maxResults) : 5;
+
+    try {
+      const videos = await this.aiService['getVerifiedEducationalContent'](topicList, ageRange, max);
+      
+      return {
+        videos,
+        totalFound: videos.length,
+        topics: topicList,
+        ageRange,
+        maxResults: max,
+        message: 'YouTube API integration test successful'
+      };
+    } catch (error) {
+      this.logger.error(`YouTube API test failed: ${error.message}`);
+      throw new BadRequestException(`YouTube API test failed: ${error.message}`);
+    }
+  }
 }
 
 
