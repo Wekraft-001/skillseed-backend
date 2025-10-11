@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AiService } from './ai.service';
 import { AiController } from './ai.controller';
+import { YouTubeService } from './youtube.service';
 import { LoggerModule } from '../../common/logger/logger.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { RewardsModule } from '../rewards/rewards.module';
@@ -16,7 +17,7 @@ import {
 
 @Module({
   imports: [
-    LoggerModule, // 👈 This provides LoggerService
+    LoggerModule, //  This provides LoggerService
     RedisModule,
     RewardsModule, // Add this to use RewardsService
     MongooseModule.forFeature([
@@ -26,7 +27,7 @@ import {
     ]),
   ],
   controllers: [AiController],
-  providers: [AiService],
+  providers: [AiService, YouTubeService],
   exports: [AiService],
 })
 export class AiModule {}
