@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AiModule } from './modules/ai/ai.module';
 
 import {
   Badge,
@@ -56,6 +57,7 @@ import { ReportsModule } from './modules/reports/reports.module';
       }),
       inject: [ConfigService],
     }),
+    AiModule,
     AuthModule,
     AiGatewayModule,
     InternalModule,
