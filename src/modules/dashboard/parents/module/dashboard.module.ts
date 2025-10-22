@@ -8,7 +8,6 @@ import { Subscription } from 'rxjs';
 import { SubscriptionSchema } from 'src/modules/schemas/subscription.schema';
 import { SubscriptionModule } from '../../../../subscription/subscription.module';
 import { PaymentModule } from 'src/payment/payment.module';
-import { AiModule } from 'src/modules/ai/ai.module';
 import {
   TempStudent,
   TempStudentSchema,
@@ -32,7 +31,6 @@ import { EmailModule } from 'src/common/utils/mailing/email.module';
     LoggerModule,
     forwardRef(() => SubscriptionModule),
     forwardRef(() => PaymentModule),
-    forwardRef(() => AiModule),
     ContentModule,
     EmailModule,
   ],

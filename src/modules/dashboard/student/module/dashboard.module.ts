@@ -19,7 +19,7 @@ import {
   PostSchema,
 } from 'src/modules/schemas';
 import { LoggerModule } from 'src/common/logger/logger.module';
-import { AiModule } from 'src/modules/ai/ai.module';
+import { AiGatewayModule } from 'src/modules/ai-gateway/ai-gateway.module';
 import { StudentDashboardController } from '../controllers/dashboard.controllers';
 import { StudentDashboardService } from '../services/dashboard.service';
 import { StudentChallengesController } from '../controllers/challenges.controller';
@@ -45,7 +45,7 @@ import { RewardsModule } from 'src/modules/rewards/rewards.module';
       { name: Post.name, schema: PostSchema },
     ]),
     LoggerModule,
-    AiModule,
+    AiGatewayModule,
     ContentModule,
     RewardsModule,
   ],

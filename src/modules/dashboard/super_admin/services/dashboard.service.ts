@@ -25,7 +25,7 @@ import { EducationalContent } from '../../../schemas/educational_content.schema'
 import { ProjectShowcase } from '../../../schemas/showcase.schema';
 import { CareerQuiz } from '../../../schemas/career-quiz.schema';
 import { School } from '../../school_admin/schema/school.schema';
-import { AiService } from 'src/modules/ai/ai.service';
+// import { AiService } from 'src/modules/ai/ai.service';
 
 @Injectable()
 export class DashboardService {
@@ -49,7 +49,7 @@ export class DashboardService {
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
 
-    private readonly aiService: AiService,
+    // private readonly aiService: AiService,
     private readonly logger: LoggerService,
   ) {}
 
@@ -176,9 +176,10 @@ export class DashboardService {
       );
 
       // Generate the content data
-      const newContentData = await this.aiService.generateEducationalContent(
-        user._id.toString(), // Convert ObjectId to string for the AI service
-      );
+      // const newContentData = await this.aiService.generateEducationalContent(
+      //   user._id.toString(), // Convert ObjectId to string for the AI service
+      // );
+      const newContentData = [];
 
       // Create and save the document using the model
       const newContent = await this.eduContentModel.create({

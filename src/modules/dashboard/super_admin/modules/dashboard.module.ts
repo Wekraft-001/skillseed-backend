@@ -14,7 +14,7 @@ import { School, SchoolSchema } from 'src/modules/schemas';
 import { DashboardService } from '../../super_admin/services';
 import { DashboardController } from '../../super_admin/controllers';
 import { LoggerModule } from 'src/common/logger/logger.module';
-import { AiModule } from 'src/modules/ai/ai.module';
+// import { AiModule } from 'src/modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -28,7 +28,6 @@ import { AiModule } from 'src/modules/ai/ai.module';
       { name: Category.name, schema: CategorySchema },
     ]),
     LoggerModule,
-    AiModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService],
