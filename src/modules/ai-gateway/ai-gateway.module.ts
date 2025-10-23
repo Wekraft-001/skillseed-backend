@@ -6,14 +6,13 @@ import { AiGatewayService } from './ai-gateway.service';
 import { AiGatewayController } from './ai-gateway.controller';
 import { InternalAiController } from './internal-ai.controller';
 import { LoggerModule } from '../../common/logger/logger.module';
-import { AiModule } from '../ai/ai.module';
+import { QuizDataService } from './quiz-data.service';
 import { CareerQuiz, CareerQuizSchema } from '../schemas/career-quiz.schema';
 
 @Module({
   imports: [
     ConfigModule,
     LoggerModule,
-    AiModule,
     HttpModule.register({
       timeout: 30000, // 30 seconds timeout for AI service calls
       maxRedirects: 2,
@@ -23,7 +22,7 @@ import { CareerQuiz, CareerQuizSchema } from '../schemas/career-quiz.schema';
     ]),
   ],
   controllers: [AiGatewayController, InternalAiController],
-  providers: [AiGatewayService],
+  providers: [AiGatewayService, QuizDataService],
   exports: [AiGatewayService],
 })
 export class AiGatewayModule {}

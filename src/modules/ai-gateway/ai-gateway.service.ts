@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { QuizDataService } from '../ai/quiz-data.service';
+import { QuizDataService } from './quiz-data.service';
 
 @Injectable()
 export class AiGatewayService {
