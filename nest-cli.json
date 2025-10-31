@@ -6,7 +6,7 @@
     "deleteOutDir": true,
     "assets": [
       {
-        "include": "modules/ai/quiz-data/**/*",
+        "include": "modules/ai-gateway/quiz-data/**/*",
         "outDir": "dist"
       }
     ],
