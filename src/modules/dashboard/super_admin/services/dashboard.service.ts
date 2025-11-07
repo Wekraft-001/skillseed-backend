@@ -19,6 +19,8 @@ import {
   CategoryDocument,
   UserDocument,
   Badge,
+  ChallengeDocument,
+  Challenge,
 } from '../../../schemas';
 import { CreateCategoryDto, UpdateCategoryDto } from '../dto/category.dto';
 import { EducationalContent } from '../../../schemas/educational_content.schema';
@@ -48,6 +50,9 @@ export class DashboardService {
 
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
+
+    @InjectModel(Challenge.name)
+    private challengeModel: Model<ChallengeDocument>,
 
     // private readonly aiService: AiService,
     private readonly logger: LoggerService,
@@ -117,7 +122,7 @@ export class DashboardService {
   }
   // ALL DASHBOARD DATA
   private async getSuperAdminDashboardData(user: User): Promise<DashboardData> {
-    const [schools, students] = await Promise.all([
+    const [schools, students, challenges] = await Promise.all([
       this.schoolModel
         .find({ deletedAt: null })
         .populate('superAdmin', 'firstName lastName email role')
@@ -131,6 +136,11 @@ export class DashboardService {
         .populate('school', 'schoolName email logoUrl')
         .populate('createdBy', 'firstName lastName email role')
         .lean(),
+      this.challengeModel
+        .find()
+        .populate('categoryId', 'name icon')
+        .populate('createdBy', 'firstName lastName email role')
+        .lean(),
     ]);
 
     return {
@@ -139,6 +149,8 @@ export class DashboardService {
       analytics: {
         totalSchools: schools.length,
         totalStudents: students.length,
+        totalChallenges: challenges.length,
+        challenges,
       },
     };
   }
@@ -146,9 +158,11 @@ export class DashboardService {
   private async getSuperAdminSummary(user: User): Promise<DashboardSummary> {
     const schoolCount = await this.schoolModel.countDocuments();
     const userCount = await this.userModel.countDocuments();
+    const challengeCount = await this.challengeModel.countDocuments();
     return {
       totalSchools: schoolCount,
       totalUsers: userCount,
+      totalChallenges: challengeCount,
       // user: user as any,
     };
   }
@@ -480,7 +494,80 @@ export class DashboardService {
     }
   }
 
+  // Get category usage statistics
+  async getCategoryUsageStats(categoryId: string) {
+    try {
+      const stats = await this.categoryModel.aggregate([
+        { $match: { _id: new Types.ObjectId(categoryId) } },
+        {
+          $lookup: {
+            from: 'challenges',
+            localField: '_id',
+            foreignField: 'categoryId',
+            as: 'challenges',
+          },
+        },
+        {
+          $lookup: {
+            from: 'communities',
+            localField: '_id',
+            foreignField: 'categoryId',
+            as: 'communities',
+          },
+        },
+        {
+          $project: {
+            name: 1,
+            description: 1,
+            icon: 1,
+            challengeCount: { $size: '$challenges' },
+            communityCount: { $size: '$communities' },
+            totalUsage: {
+              $add: [{ $size: '$challenges' }, { $size: '$communities' }],
+            },
+            challenges: {
+              $map: {
+                input: '$challenges',
+                as: 'challenge',
+                in: {
+                  _id: '$$challenge._id',
+                  title: '$$challenge.title',
+                  type: '$$challenge.type',
+                  createdAt: '$$challenge.createdAt',
+                },
+              },
+            },
+            communities: {
+              $map: {
+                input: '$communities',
+                as: 'community',
+                in: {
+                  _id: '$$community._id',
+                  name: '$$community.name',
+                  createdAt: '$$community.createdAt',
+                },
+              },
+            },
+          },
+        },
+      ]);
+
+      if (!stats || stats.length === 0) {
+        throw new NotFoundException(`Category with ID ${categoryId} not found`);
+      }
+
+      return stats[0];
+    } catch (error) {
+      this.logger.error(
+        `Error getting category usage stats: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
   // USERS SERVICES
+  // GET ALL USERS
   async findAllUsers(): Promise<User[]> {
     return this.userModel
       .find({ deletedAt: null })
@@ -491,8 +578,79 @@ export class DashboardService {
       .exec();
   }
 
-  async findById(userId: string | Types.ObjectId) {
-    if (!userId) return null;
-    return this.userModel.findById(userId).lean().exec();
+  // async findById(userId: string | Types.ObjectId) {
+  //   if (!userId) return null;
+  //   return this.userModel.findById(userId).lean().exec();
+  // }
+
+  // GET USER BY ID
+  async findUserById(userId: string): Promise<User> {
+    try {
+      const user = await this.userModel
+        .findById(userId)
+        .populate('school', 'schoolName email logoUrl')
+        .populate('createdBy', 'firstName lastName email role')
+        .populate('subscription')
+        .lean()
+        .exec();
+
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      return user;
+    } catch (error) {
+      this.logger.error(
+        `Error finding user by ID ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  // DELETE USER
+  async DeleteUser(
+    userId: string,
+    adminId: string,
+  ): Promise<{ message: string }> {
+    try {
+      // Check if admin user exists and is super admin
+      const admin = await this.userModel.findById(adminId);
+      if (!admin) {
+        throw new NotFoundException('Admin user not found');
+      }
+
+      if (admin.role !== UserRole.SUPER_ADMIN) {
+        throw new ForbiddenException('Only super admins can delete users');
+      }
+
+      // Check if user to be deleted exists
+      const user = await this.userModel.findById(userId).exec();
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      // Prevent users from deleting themselves
+      if (userId === adminId) {
+        throw new BadRequestException('You cannot delete your own account');
+      }
+
+      // Permanently delete the user
+      await this.userModel.findByIdAndDelete(userId).exec();
+
+      this.logger.log(
+        `User permanently deleted: ${userId} by admin ${adminId}`,
+      );
+
+      return {
+        message: `User ${userId} has been permanently deleted`,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error permanently deleting user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 }

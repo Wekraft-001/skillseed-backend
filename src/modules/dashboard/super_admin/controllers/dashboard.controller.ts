@@ -131,6 +131,28 @@ export class DashboardController {
     return this.dashboardService.findOne(id);
   }
 
+  @Get('category/:id/usage-stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get detailed usage statistics for a category (Super Admin only)',
+    description:
+      'Returns detailed usage information including lists of all challenges and communities',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Return detailed usage statistics for the category.',
+  })
+  @ApiResponse({ status: 404, description: 'Category not found.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden resource, only super admins can access.',
+  })
+  getCategoryUsageStats(@Param('id') id: string) {
+    return this.dashboardService.getCategoryUsageStats(id);
+  }
+
   @Patch('category/:id')
   @ApiOperation({ summary: 'Update a category (Super Admin only)' })
   @ApiBody({
@@ -191,5 +213,75 @@ export class DashboardController {
   @Get('all-users')
   async getAllUsers() {
     return this.dashboardService.findAllUsers();
+  }
+
+  @Get('user/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get user by ID',
+    description:
+      'Retrieve a specific user by their ID. Super admins can view any user, school admins can view users they created.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User retrieved successfully',
+    type: User,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins and school admins can access',
+  })
+  async getUserById(@Param('id') id: string) {
+    this.logger.log(`Fetching user with ID: ${id}`);
+    return this.dashboardService.findUserById(id);
+  }
+
+  @Delete('user/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Permanently delete user (Super Admin only)',
+    description:
+      'Permanently delete a user from the database. This action cannot be undone. Only super admins can perform this operation.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User permanently deleted successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Cannot delete own account',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Only super admins can access',
+  })
+  async permanentlyDeleteUser(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    this.logger.log(
+      `Super admin ${(user as any)._id} attempting to permanently delete user: ${id}`,
+    );
+    return this.dashboardService.DeleteUser(id, (user as any)._id);
   }
 }

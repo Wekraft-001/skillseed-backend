@@ -3,6 +3,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import {
   Category,
   CategorySchema,
+  Challenge,
+  ChallengeSchema,
   EducationalContent,
   EducationalContentSchema,
 } from 'src/modules/schemas';
@@ -26,6 +28,7 @@ import { LoggerModule } from 'src/common/logger/logger.module';
       { name: CareerQuiz.name, schema: CareerQuizSchema },
       { name: School.name, schema: SchoolSchema },
       { name: Category.name, schema: CategorySchema },
+      { name: Challenge.name, schema: ChallengeSchema },
     ]),
     LoggerModule,
   ],

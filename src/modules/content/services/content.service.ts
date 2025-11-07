@@ -252,4 +252,79 @@ export class ContentService {
       throw error;
     }
   }
+
+  async getChallengesForAdmin(userId: string) {
+    try {
+      // Check if user is a super admin
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        throw new ForbiddenException(
+          'Only super admins can access this endpoint',
+        );
+      }
+
+      // Get challenges with interaction counts
+      const challenges = await this.challengeModel
+        .find()
+        .populate('categoryId', 'name')
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec();
+
+      return challenges.map((challenge) => ({
+        ...challenge,
+        uniqueStudents: 0,
+        totalSubmissions: 0,
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Error getting challenges for admin: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async getChallengeDetailsByIdForAdmin(challengeId: string, userId: string) {
+    try {
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== UserRole.SUPER_ADMIN) {
+        throw new ForbiddenException(
+          'Only super admins can access this endpoint',
+        );
+      }
+
+      const challengeDetails = await this.challengeModel
+        .findById(challengeId)
+        .populate('categoryId', 'name')
+        .populate('createdBy', 'name email')
+        .lean()
+        .exec();
+
+      if (!challengeDetails) {
+        throw new NotFoundException('Challenge not found');
+      }
+
+      return {
+        ...challengeDetails,
+        uniqueStudents: 0,
+        totalSubmission: 0,
+        studentList: [],
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting challenge details for admin: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
 }
