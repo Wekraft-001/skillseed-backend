@@ -117,4 +117,32 @@ export class ContentController {
   getChallengeById(@Param('id') id: string) {
     return this.contentService.getChallengeById(id);
   }
+
+  @Get('challenges/admin/list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary:
+      'Get all challenges created by admin with interaction statistics (Super Admin only)',
+  })
+  getChallengesForAdmin(@CurrentUser() user: User) {
+    return this.contentService.getChallengesForAdmin((user as any)._id);
+  }
+
+  @Get('challenges/admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary:
+      'Get detailed challenge information including student interactions (Super Admin only)',
+  })
+  getChallengeDetailsForAdmin(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ) {
+    return this.contentService.getChallengeDetailsByIdForAdmin(
+      id,
+      (user as any)._id,
+    );
+  }
 }
