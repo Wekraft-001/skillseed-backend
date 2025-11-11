@@ -361,4 +361,86 @@ export class CommunityService {
       throw error;
     }
   }
+
+  async getSubmissionsWithFiles(challengeId?: string) {
+    try {
+      // Build query - if challengeId is provided, filter by it
+      const query: any = { workFileUrl: { $exists: true, $ne: null } };
+      
+      if (challengeId) {
+        query.challengeId = new Types.ObjectId(challengeId);
+      }
+
+      // Get submissions that have uploaded files
+      const submissions = await this.completedChallengeModel
+        .find(query)
+        .populate('userId', 'firstName lastName email image')
+        .populate('challengeId', 'title description type ageRange')
+        .select('userId challengeId completedAt completionNotes workFileUrl')
+        .sort({ completedAt: -1 })
+        .exec();
+
+      // Group by challenge if no specific challengeId provided
+      if (!challengeId) {
+        const groupedByChallenge = submissions.reduce((acc, submission) => {
+          const challenge = submission.challengeId as any;
+          const challengeKey = challenge._id.toString();
+          
+          if (!acc[challengeKey]) {
+            acc[challengeKey] = {
+              challengeId: challenge._id,
+              challengeTitle: challenge.title,
+              challengeType: challenge.type,
+              submissionsWithFiles: [],
+            };
+          }
+          
+          acc[challengeKey].submissionsWithFiles.push({
+            _id: submission._id,
+            student: submission.userId,
+            completedAt: submission.completedAt,
+            completionNotes: submission.completionNotes,
+            workFileUrl: submission.workFileUrl,
+          });
+          
+          return acc;
+        }, {});
+
+        return {
+          totalSubmissionsWithFiles: submissions.length,
+          challenges: Object.values(groupedByChallenge),
+        };
+      }
+
+      // For specific challenge, return submissions directly
+      const challenge = await this.challengeModel
+        .findById(challengeId)
+        .select('title description type ageRange')
+        .exec();
+
+      if (!challenge) {
+        throw new NotFoundException('Challenge not found');
+      }
+
+      return {
+        challengeId: challenge._id,
+        challengeTitle: challenge.title,
+        challengeType: challenge.type,
+        totalSubmissionsWithFiles: submissions.length,
+        submissions: submissions.map((submission) => ({
+          _id: submission._id,
+          student: submission.userId,
+          completedAt: submission.completedAt,
+          completionNotes: submission.completionNotes,
+          workFileUrl: submission.workFileUrl,
+        })),
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting submissions with files: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
 }

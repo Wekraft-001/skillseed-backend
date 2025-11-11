@@ -2,11 +2,13 @@ import {
   Controller,
   Get,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -69,5 +71,49 @@ export class ChallengeController {
   })
   getAllChallengesWithStats() {
     return this.communityService.getAllChallengesWithStats();
+  }
+
+  @Get('submissions/files')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get all student submissions with uploaded files' })
+  @ApiQuery({ 
+    name: 'challengeId', 
+    required: false,
+    description: 'Optional: Filter by specific challenge ID' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns all submissions that have uploaded files',
+    schema: {
+      example: {
+        totalSubmissionsWithFiles: 25,
+        challenges: [
+          {
+            challengeId: '507f1f77bcf86cd799439011',
+            challengeTitle: 'Build a Robot',
+            challengeType: 'project',
+            submissionsWithFiles: [
+              {
+                _id: '507f1f77bcf86cd799439013',
+                student: {
+                  _id: '507f1f77bcf86cd799439012',
+                  firstName: 'John',
+                  lastName: 'Doe',
+                  email: 'john@example.com',
+                  image: 'https://...'
+                },
+                completedAt: '2025-11-10T12:00:00.000Z',
+                completionNotes: 'Built a line-following robot',
+                workFileUrl: 'https://azure-storage/challenge-files/robot.pdf'
+              }
+            ]
+          }
+        ]
+      }
+    }
+  })
+  getSubmissionsWithFiles(@Query('challengeId') challengeId?: string) {
+    return this.communityService.getSubmissionsWithFiles(challengeId);
   }
 }
