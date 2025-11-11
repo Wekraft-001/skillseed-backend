@@ -112,6 +112,47 @@ export class CommunityController {
     return this.communityService.deactivateCommunity(id, (user as any)._id);
   }
 
+  @Get(':id/members/count')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get member count and list for a specific community' })
+  @ApiParam({ name: 'id', description: 'Community ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns community member count and member list',
+    schema: {
+      example: {
+        communityId: '507f1f77bcf86cd799439011',
+        communityName: 'Young Scientists',
+        memberCount: 25,
+        members: [
+          {
+            _id: '507f1f77bcf86cd799439012',
+            firstName: 'John',
+            lastName: 'Doe',
+            email: 'john@example.com',
+            image: 'https://...'
+          }
+        ]
+      }
+    }
+  })
+  getCommunityMemberCount(@Param('id') id: string) {
+    return this.communityService.getCommunityMemberCount(id);
+  }
+
+  @Get('stats/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN)
+  @ApiOperation({ summary: 'Get all communities with member counts' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Returns all communities with their member counts' 
+  })
+  getAllCommunitiesWithStats() {
+    return this.communityService.getAllCommunitiesWithStats();
+  }
+
   // @Post('seed')
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles(UserRole.SUPER_ADMIN)

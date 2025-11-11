@@ -327,7 +327,7 @@ export class AiGatewayService {
           this.httpService.post(
             `${this.aiServiceUrl}/api/ai/guest/quiz`,
             { sessionId, ageRange },
-            { timeout: 30000 }
+            { timeout: 30000 } // Increased timeout for guest quiz creation
           )
         );
         
@@ -416,7 +416,7 @@ export class AiGatewayService {
           this.httpService.post(
             `${this.aiServiceUrl}/api/ai/guest/quiz/submit`,
             quizData,
-            { timeout: 60000 }
+            { timeout: 60000 } // Increased timeout to match regular quiz submissions
           )
         );
         
