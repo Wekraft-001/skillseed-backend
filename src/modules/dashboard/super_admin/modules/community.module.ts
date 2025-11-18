@@ -8,8 +8,13 @@ import {
   CommunitySchema,
   User,
   UserSchema,
+  Challenge,
+  ChallengeSchema,
+  CompletedChallenge,
+  CompletedChallengeSchema,
 } from '../../../schemas';
 import { CommunityController } from '../controllers/community.controller';
+import { ChallengeController } from '../controllers/challenge.controller';
 import { CommunityService } from '../services/community.service';
 // import { SeedCommunitiesService } from './commands/seed-communities.command';
 
@@ -19,10 +24,12 @@ import { CommunityService } from '../services/community.service';
       { name: Community.name, schema: CommunitySchema },
       { name: User.name, schema: UserSchema },
       { name: Category.name, schema: CategorySchema },
+      { name: Challenge.name, schema: ChallengeSchema },
+      { name: CompletedChallenge.name, schema: CompletedChallengeSchema },
     ]),
     LoggerModule,
   ],
-  controllers: [CommunityController],
+  controllers: [CommunityController, ChallengeController],
   providers: [CommunityService],
   exports: [CommunityService],
 })

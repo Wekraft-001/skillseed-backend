@@ -3,3 +3,4 @@ export * from './school.controller';
 export * from './mentor.controller';
 export * from './transaction.controller';
 export * from './community.controller';
+export * from './challenge.controller';
