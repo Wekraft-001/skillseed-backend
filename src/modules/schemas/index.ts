@@ -19,3 +19,4 @@ export * from './achievement.schema';
 export * from './transaction.schema';
 export * from './subscription.schema';
 export * from './mentor-credential.schema';
+export * from './learning-progress.schema';

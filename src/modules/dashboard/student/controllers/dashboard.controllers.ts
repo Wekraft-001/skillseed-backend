@@ -28,6 +28,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { RewardsService } from 'src/modules/rewards/rewards.service';
+import { LearningProgressService } from '../services/learning-progress.service';
 
 @Controller('student/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,6 +40,7 @@ export class StudentDashboardController {
     private readonly studentDashboardService: StudentDashboardService,
     private readonly logger: LoggerService,
     private readonly rewardsService: RewardsService,
+    private readonly learningProgressService: LearningProgressService,
   ) {}
 
   /**
@@ -171,9 +173,40 @@ export class StudentDashboardController {
       payload.contentIndex,
     );
 
+    await this.learningProgressService.onEducationalContentCompleted(
+      (student as any)._id.toString(),
+      payload.contentType,
+    );
+
     return {
       message: `${payload.contentType} marked as completed successfully`,
       star,
     };
+  }
+
+  // ───Learning Journey endpoint ─────────────────────────────────────
+  @Get('learning-journey')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Get the student's learning journey stats (reading, videos, problem solving, streak)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns learning journey progress and streak data',
+    schema: {
+      example: {
+        streak: 5,
+        longestStreak: 12,
+        reading: { completed: 15, target: 20, percentage: 75 },
+        videos: { watched: 8, target: 10, percentage: 80 },
+        problemSolving: { completed: 12, target: 15, percentage: 80 },
+      },
+    },
+  })
+  async getLearningJourney(@CurrentUser() student: User) {
+    return this.learningProgressService.getLearningJourney(
+      (student as any)._id.toString(),
+    );
   }
 }

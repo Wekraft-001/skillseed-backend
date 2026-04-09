@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiExcludeEndpoint, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
 
 @Controller()
@@ -7,14 +7,16 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
+  @ApiExcludeEndpoint()
   getHello(): string {
     return this.appService.getHello();
   }
-  
+
   @Get('health')
+  @ApiExcludeEndpoint()
   @ApiOperation({ summary: 'Health check for the API' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Service health information',
     schema: {
       type: 'object',
@@ -22,9 +24,9 @@ export class AppController {
         status: { type: 'string' },
         version: { type: 'string' },
         timestamp: { type: 'string' },
-        environment: { type: 'string' }
-      }
-    }
+        environment: { type: 'string' },
+      },
+    },
   })
   healthCheck() {
     return this.appService.healthCheck();

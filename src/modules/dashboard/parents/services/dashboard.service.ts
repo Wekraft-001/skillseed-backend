@@ -28,6 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { TempStudent } from 'src/modules/schemas/temp-student.schema';
 import { Transaction } from 'src/modules/schemas/transaction.schema';
 import { EmailService } from 'src/common/utils/mailing/email.service';
+import { ParentChildOverviewService } from './parent-child-overview.service';
 
 @Injectable()
 export class ParentDashboardService {
@@ -44,6 +45,7 @@ export class ParentDashboardService {
     private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(TempStudent.name) private tempStudentModel: Model<TempStudent>,
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    private readonly childOverviewService: ParentChildOverviewService,
     private emailService: EmailService,
   ) {}
 
@@ -391,6 +393,49 @@ export class ParentDashboardService {
       .lean();
   }
 
+  async getStudentById(parentId: string, studentId: string) {
+    // Ownership-aware overview (career, badges, learning journey, activities)
+    const overview = await this.childOverviewService.getChildOverview(
+      parentId,
+      studentId,
+    );
+
+    // Full user document for fields not surfaced by the overview
+    // (subscription status, grade, school, registration date, etc.)
+    const fullStudent = await this.userModel
+      .findById(studentId)
+      .select('-password -plainPassword -__v')
+      .populate(
+        'subscription',
+        'isActive endDate amount currency paymentStatus plan',
+      )
+      .lean()
+      .exec();
+
+    if (!fullStudent) throw new NotFoundException('Student not found');
+
+    return {
+      // Flat student document fields
+      profile: {
+        id: fullStudent._id.toString(),
+        firstName: fullStudent.firstName,
+        lastName: fullStudent.lastName,
+        age: (fullStudent as any).age,
+        grade: (fullStudent as any).grade,
+        image: (fullStudent as any).image || null,
+        email: (fullStudent as any).email || null,
+        school: (fullStudent as any).school || null,
+        registeredAt: (fullStudent as any).createdAt,
+        subscription: (fullStudent as any).subscription || null,
+      },
+      // Aggregated learning data from ParentChildOverviewService
+      careerProfile: overview.careerProfile,
+      learningActivities: overview.learningActivities,
+      learningJourney: overview.learningJourney,
+      badges: overview.badges,
+      lastActive: overview.lastActive,
+    };
+  }
   async getUserSubscriptions(user: User) {
     try {
       this.logger.log(`Fetching subscriptions for user: ${user._id}`);
@@ -420,6 +465,13 @@ export class ParentDashboardService {
     }
   }
 
+  async getChildOverview(parentId: string, childId: string) {
+    return this.childOverviewService.getChildOverview(parentId, childId);
+  }
+
+  async getAllChildrenOverview(parentId: string) {
+    return this.childOverviewService.getAllChildrenOverview(parentId);
+  }
   /**
    * Calculates the age range for a given age.
    * @param age number

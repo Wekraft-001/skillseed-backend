@@ -1,14 +1,19 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { 
-  Challenge, 
-  CompletedChallenge, 
+import {
+  Challenge,
+  CompletedChallenge,
   CompletedChallengeDocument,
-  ChallengeDocument
+  ChallengeDocument,
 } from 'src/modules/schemas';
 import { RewardsService } from 'src/modules/rewards/rewards.service';
+import { LearningProgressService } from './learning-progress.service';
 
 @Injectable()
 export class CompletedChallengesService {
@@ -18,6 +23,7 @@ export class CompletedChallengesService {
     @InjectModel(Challenge.name)
     private challengeModel: Model<ChallengeDocument>,
     private readonly rewardsService: RewardsService,
+    private readonly learningProgressService: LearningProgressService,
     private readonly logger: LoggerService,
   ) {
     this.logger.setContext('CompletedChallengesService');
@@ -45,7 +51,7 @@ export class CompletedChallengesService {
       const completedChallenge = await this.completedChallengeModel
         .findOne({ userId, challengeId })
         .exec();
-      
+
       return !!completedChallenge;
     } catch (error) {
       this.logger.error(
@@ -56,7 +62,12 @@ export class CompletedChallengesService {
     }
   }
 
-  async completeChallenge(userId: string, challengeId: string, completionNotes?: string, workFileUrl?: string) {
+  async completeChallenge(
+    userId: string,
+    challengeId: string,
+    completionNotes?: string,
+    workFileUrl?: string,
+  ) {
     try {
       // Check if challenge exists
       const challenge = await this.challengeModel.findById(challengeId).exec();
@@ -68,7 +79,7 @@ export class CompletedChallengesService {
       const existingCompletion = await this.completedChallengeModel
         .findOne({ userId, challengeId })
         .exec();
-      
+
       if (existingCompletion) {
         throw new ConflictException('Challenge already completed by this user');
       }
@@ -84,12 +95,20 @@ export class CompletedChallengesService {
       await completedChallenge.save();
 
       // Award badge and stars for challenge completion
-      const badge = await this.rewardsService.completeChallenge(userId, challengeId, completionNotes, workFileUrl);
+      const badge = await this.rewardsService.completeChallenge(
+        userId,
+        challengeId,
+        completionNotes,
+        workFileUrl,
+      );
+
+      // update learning journey counters
+      await this.learningProgressService.onChallengeCompleted(userId);
 
       return {
         message: 'Challenge completed successfully',
         challenge,
-        badge
+        badge,
       };
     } catch (error) {
       this.logger.error(

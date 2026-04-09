@@ -26,6 +26,7 @@ import { CurrentUser } from 'src/common/decorators';
 import {
   ApiBadRequestResponse,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -113,6 +114,28 @@ export class ParentDashboardController {
     }
   }
 
+  @Get('students/:studentId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get complete profile for a single student',
+    description:
+      'Returns the full student profile including registration details, ' +
+      'subscription status, career profile (interests, skills, dream job from quiz), ' +
+      'learning activity counts (challenges, books, videos, games), ' +
+      'learning journey progress (reading %, video %, problem solving %, streak), ' +
+      'and recent badges. Returns 404 if the student does not belong to this parent.',
+  })
+  @ApiParam({ name: 'studentId', description: 'Student MongoDB ObjectId' })
+  async getStudentById(
+    @CurrentUser() user: User,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.parentDashboardService.getStudentById(
+      (user as any)._id.toString(),
+      studentId,
+    );
+  }
+
   @ApiOperation({
     summary: 'Get all subscriptions created by the parent (with child details)',
   })
@@ -129,5 +152,92 @@ export class ParentDashboardController {
       );
       throw error;
     }
+  }
+
+  @Get('children/overview')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Get a summary overview for ALL children of the authenticated parent. ' +
+      'Returns career profile, learning activities, badges, and learning journey ' +
+      'stats for each child. Used to populate child-switcher cards on the dashboard.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Array of child overview objects',
+    schema: {
+      example: [
+        {
+          child: {
+            id: '664abc...',
+            firstName: 'Sophia',
+            lastName: 'Kelechi',
+            age: 14,
+            grade: 'Grade 9',
+            image: 'https://...',
+          },
+          careerProfile: {
+            interests: ['Technology', 'Science'],
+            skills: ['Curious learner', 'Self-motivated'],
+            dreamJob: 'Software Engineer',
+            quizCompleted: true,
+          },
+          learningActivities: {
+            totalCompleted: 8,
+            challengesCompleted: 4,
+            booksCompleted: 2,
+            videosWatched: 2,
+            gamesPlayed: 0,
+          },
+          learningJourney: {
+            streak: 5,
+            reading: { completed: 2, target: 20, percentage: 10 },
+            videos: { watched: 2, target: 10, percentage: 20 },
+            problemSolving: { completed: 4, target: 15, percentage: 27 },
+          },
+          badges: {
+            total: 3,
+            recent: [
+              {
+                id: '665def...',
+                name: 'First Challenge',
+                earnedAt: '2026-04-01T10:00:00.000Z',
+              },
+            ],
+          },
+          lastActive: '2026-04-09T00:00:00.000Z',
+        },
+      ],
+    },
+  })
+  async getAllChildrenOverview(@CurrentUser() user: User) {
+    return this.parentDashboardService.getAllChildrenOverview(
+      (user as any)._id.toString(),
+    );
+  }
+
+  @Get('children/:childId/overview')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Get a detailed overview for a single child. ' +
+      'Includes career profile (from quiz analysis), learning activity counts, ' +
+      'learning journey progress, and recent badges. ' +
+      'Returns 404 if the child does not belong to the authenticated parent.',
+  })
+  @ApiParam({
+    name: 'childId',
+    description: 'Child (student) MongoDB ObjectId',
+  })
+  @ApiResponse({ status: 200, description: 'Child overview object' })
+  @ApiResponse({ status: 404, description: 'Child not found or access denied' })
+  async getChildOverview(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ) {
+    return this.parentDashboardService.getChildOverview(
+      (user as any)._id.toString(),
+      childId,
+    );
   }
 }
