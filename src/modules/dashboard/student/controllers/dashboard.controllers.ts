@@ -129,7 +129,7 @@ export class StudentDashboardController {
       student._id.toString(),
     );
   }
-  
+
   @Get('career-recommendation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -148,28 +148,28 @@ export class StudentDashboardController {
   }
 
   // ───Learning Journey endpoint ─────────────────────────────────────
-  // @Get('learning-journey')
-  // @HttpCode(HttpStatus.OK)
-  // @ApiOperation({
-  //   summary:
-  //     "Get the student's learning journey stats (reading, videos, problem solving, streak)",
-  // })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Returns learning journey progress and streak data',
-  //   schema: {
-  //     example: {
-  //       streak: 5,
-  //       longestStreak: 12,
-  //       reading: { completed: 15, target: 20, percentage: 75 },
-  //       videos: { watched: 8, target: 10, percentage: 80 },
-  //       problemSolving: { completed: 12, target: 15, percentage: 80 },
-  //     },
-  //   },
-  // })
-  // async getLearningJourney(@CurrentUser() student: User) {
-  //   return this.learningProgressService.getLearningJourney(
-  //     (student as any)._id.toString(),
-  //   );
-  // }
+  @Get('learning-journey')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Get the student's learning journey stats (reading, videos, problem solving, streak)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns learning journey progress and streak data',
+    schema: {
+      example: {
+        streak: 5,
+        longestStreak: 12,
+        reading: { completed: 15, target: 20, percentage: 75 },
+        videos: { watched: 8, target: 10, percentage: 80 },
+        problemSolving: { completed: 12, target: 15, percentage: 80 },
+      },
+    },
+  })
+  async getLearningJourney(@CurrentUser() student: User) {
+    return this.learningProgressService.getLearningJourney(
+      (student as any)._id.toString(),
+    );
+  }
 }
