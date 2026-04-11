@@ -10,6 +10,7 @@ import {
 import { RewardsService } from 'src/modules/rewards/rewards.service';
 import { LearningProgressService } from 'src/modules/dashboard/student/services/learning-progress.service';
 import { UserRole } from 'src/common/interfaces';
+import { CareerRecommendationService } from '../../student/services/career-recommendation.service';
 
 // ── Shaped response types ──────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ export class ParentChildOverviewService {
     private readonly completedChallengeModel: Model<CompletedChallengeDocument>,
     private readonly rewardsService: RewardsService,
     private readonly learningProgressService: LearningProgressService,
+    private readonly careerRecService: CareerRecommendationService,
     private readonly logger: LoggerService,
   ) {
     this.logger.setContext('ParentChildOverviewService');
@@ -84,11 +86,7 @@ export class ParentChildOverviewService {
     parentId: string,
     childId: string,
   ): Promise<ChildOverviewResponse> {
-    // ── Step 1: fetch by _id + role ONLY ─────────────────────────────────
-    // Do NOT include `parent` in this query. The student document may store
-    // the parent reference under `createdBy`, `parent`, or both, depending
-    // on which registration path was used. Adding `parent` here causes a
-    // false 404 when that field is null/unset on the document.
+    // ── Step 1: fetch by _id + role ONLY
     const child = await this.userModel
       .findOne({
         _id: new Types.ObjectId(childId),
@@ -102,8 +100,7 @@ export class ParentChildOverviewService {
       throw new NotFoundException('Child not found');
     }
 
-    // ── Step 2: ownership check in application code ───────────────────────
-    // Compare string representations to avoid ObjectId vs string mismatches.
+    // ── Step 2: ownership check in application code
     const parentIdStr = parentId.toString();
     const childParentStr = (child as any).parent?.toString() ?? '';
     const childCreatedByStr = (child as any).createdBy?.toString() ?? '';
@@ -128,22 +125,29 @@ export class ParentChildOverviewService {
     }
 
     // ── Step 3: fetch all child data in parallel ──────────────────────────
-    const [quiz, eduContents, completedChallenges, badges, learningJourney] =
-      await Promise.all([
-        this.getLatestQuiz(childId),
-        this.eduContentModel
-          .find({ user: new Types.ObjectId(childId) })
-          .lean()
-          .exec(),
-        this.completedChallengeModel.find({ userId: childId }).lean().exec(),
-        this.rewardsService.getBadgesForUser(childId),
-        this.learningProgressService
-          .getLearningJourney(childId)
-          .catch(() => null),
-      ]);
+    const [
+      // quiz,
+      careerProfile,
+      eduContents,
+      completedChallenges,
+      badges,
+      learningJourney,
+    ] = await Promise.all([
+      this.careerRecService.getCareerProfileSummary(childId).catch(() => null),
+      // this.getLatestQuiz(childId),
+      this.eduContentModel
+        .find({ user: new Types.ObjectId(childId) })
+        .lean()
+        .exec(),
+      this.completedChallengeModel.find({ userId: childId }).lean().exec(),
+      this.rewardsService.getBadgesForUser(childId),
+      this.learningProgressService
+        .getLearningJourney(childId)
+        .catch(() => null),
+    ]);
 
     // ── Step 4: shape sections ────────────────────────────────────────────
-    const careerProfile = this.buildCareerProfile(quiz);
+    // const careerProfile = this.buildCareerProfile(careerSummary);
     const learningActivities = this.buildLearningActivities(
       completedChallenges,
       eduContents,
@@ -198,32 +202,6 @@ export class ParentChildOverviewService {
   }
 
   // ── Section builders ────────────────────────────────────────────────────
-
-  private async getLatestQuiz(childId: string): Promise<CareerQuiz | null> {
-    return this.quizModel
-      .findOne({ user: new Types.ObjectId(childId) })
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
-  }
-
-  private buildCareerProfile(quiz: CareerQuiz | null): CareerProfileSummary {
-    if (!quiz || !(quiz as any).completed) {
-      return {
-        interests: [],
-        skills: [],
-        dreamJob: null,
-        quizCompleted: false,
-      };
-    }
-    const analysis = (quiz as any).analysis || {};
-    return {
-      interests: analysis.interests || [],
-      skills: analysis.strengths || [],
-      dreamJob: analysis.careerPaths?.[0] ?? null,
-      quizCompleted: true,
-    };
-  }
 
   private buildLearningActivities(
     completedChallenges: any[],

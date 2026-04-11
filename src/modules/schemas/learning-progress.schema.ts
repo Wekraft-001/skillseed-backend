@@ -5,41 +5,26 @@ export type LearningProgressDocument = LearningProgress & Document;
 
 @Schema({ timestamps: true })
 export class LearningProgress {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
-  userId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  user: Types.ObjectId;
 
-  // ── Reading ──────────────────────────────────────────────
-  @Prop({ default: 0 })
-  booksCompleted: number;
+  @Prop({ type: String, enum: ['video', 'book', 'game'], required: true })
+  contentType: 'video' | 'book' | 'game';
 
-  /** Target used to compute the reading percentage shown in the UI */
-  @Prop({ default: 20 })
-  booksTarget: number;
+  @Prop({ type: String, required: true })
+  contentId: string;
 
-  // ── Videos ───────────────────────────────────────────────
-  @Prop({ default: 0 })
-  videosWatched: number;
+  @Prop({ type: Number, required: true })
+  contentIndex: number;
 
-  @Prop({ default: 10 })
-  videosTarget: number;
+  @Prop({ type: String, required: false })
+  contentTitle?: string;
 
-  // ── Problem Solving (challenges / projects) ───────────────
-  @Prop({ default: 0 })
-  challengesCompleted: number;
+  @Prop({ type: Date, default: Date.now })
+  completedAt: Date;
 
-  @Prop({ default: 15 })
-  challengesTarget: number;
-
-  // ── Streak ───────────────────────────────────────────────
-  @Prop({ default: 0 })
-  currentStreak: number;
-
-  @Prop({ default: 0 })
-  longestStreak: number;
-
-  /** UTC date string (YYYY-MM-DD) of the last day the student was active */
-  @Prop({ default: null })
-  lastActiveDate: string | null;
+  @Prop({ type: Number, default: 0 })
+  timeSpentSeconds: number;
 }
 
 export const LearningProgressSchema =

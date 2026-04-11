@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, CareerQuiz, EducationalContent } from 'src/modules/schemas';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { AiGatewayService } from 'src/modules/ai-gateway/ai-gateway.service';
 import { RewardsService } from 'src/modules/rewards/rewards.service';
-import { DashboardResponse } from 'src/common/interfaces';
+import { DashboardResponse, UserProfileDto } from 'src/common/interfaces';
+import { CareerRecommendationService } from './career-recommendation.service';
+import { LearningProgressService } from './learning-progress.service';
 
 @Injectable()
 export class StudentDashboardService {
@@ -19,6 +21,8 @@ export class StudentDashboardService {
     private readonly logger: LoggerService,
     private readonly aiService: AiGatewayService,
     private readonly rewardsService: RewardsService,
+    private readonly careerRecService: CareerRecommendationService,
+    private readonly learningProgressService: LearningProgressService,
   ) {}
 
   async getDashboardData(
@@ -41,7 +45,7 @@ export class StudentDashboardService {
     // Count completed quizzes based on actual quiz completion status
     const summary = {
       totalBadges: badges.length,
-      completedQuizzes: quizStatus.isCompleted ? 1 : 0, // Use actual quiz completion status
+      completedQuizzes: quizStatus.isCompleted ? 1 : 0,
       totalStars: stars.reduce(
         (total, star) => total + (star.starValue || 0),
         0,
@@ -66,24 +70,6 @@ export class StudentDashboardService {
         currentUser: completeUserData || student,
       },
     };
-  }
-
-  async getInitialQuiz(student: User): Promise<CareerQuiz | null> {
-    // Check if student has an initial quiz assigned
-    if (!student.initialQuizId) {
-      return null;
-    }
-
-    // Get the quiz details
-    const quiz = await this.quizModel.findById(student.initialQuizId);
-    if (!quiz) {
-      this.logger.warn(
-        `Initial quiz ${student.initialQuizId} not found for student ${student._id}`,
-      );
-      return null;
-    }
-
-    return quiz;
   }
 
   async getQuizStatusForUser(student: User): Promise<{
@@ -202,88 +188,16 @@ export class StudentDashboardService {
     return quizzes;
   }
 
-  async submitQuizAnswers(
-    student: User,
-    quizId: string,
-    answers: { phaseIndex: number; questionIndex: number; answer: string }[],
-    token: string,
-  ) {
-    // Use AI Gateway service to submit and analyze answers
-    const result = await this.aiService.submitQuiz(
-      { quizId, answers },
-      // student._id.toString(),
-      token,
-    );
-
-    // Generate recommendations based on quiz results
-    await this.fetchAndSaveRecommendations(student, token);
-
-    return result;
-  }
-
-  // Fetch recommendations from AI Microservice and save them locally
-  private async fetchAndSaveRecommendations(student: User, token: string) {
-    try {
-      this.logger.log(
-        `Fetching educational recommendations for student ${student._id} from AI service`,
-      );
-
-      // Get recommendations from AI microservice
-      const aiRecommendations = await this.aiService.getRecommendations(
-        student._id.toString(),
-        token,
-      );
-
-      this.logger.log(
-        `Received recommendations from AI service: ${JSON.stringify(aiRecommendations)}`,
-      );
-
-      // If no content was generated, create some default content
-      if (
-        !aiRecommendations ||
-        (!aiRecommendations.videoUrl?.length &&
-          !aiRecommendations.books?.length &&
-          !aiRecommendations.games?.length)
-      ) {
-        this.logger.log(
-          `No content in AI recommendations, Creating default educational content for student ${student._id}`,
-        );
-        return await this.createDefaultContent(student);
-      }
-
-      // Save the AI-generated content
-      const savedContent = await this.eduContentModel.create({
-        ...aiRecommendations,
-        user: student._id,
-      });
-
-      this.logger.log(
-        `Saved educational content from AI service with ID: ${savedContent._id}`,
-      );
-
-      // Update the user to link to this educational content
-      await this.userModel.findByIdAndUpdate(
-        student._id,
-        { $addToSet: { educationalContents: savedContent._id } },
-        { new: true },
-      );
-
-      return savedContent;
-    } catch (error) {
-      this.logger.warn(
-        `Unable to generate recommendations for student ${student._id}: ${error.message}`,
-        error.stack,
-      );
-
-      return await this.createDefaultContent(student);
-    }
-  }
-
   async getRecommendations(student: User, token: string) {
-    // Get existing recommendations or generate new ones
+    const userId = student._id.toString();
+
     let content = await this.eduContentModel
-      .find({ user: student._id })
-      .sort({ createdAt: -1 });
+      .find({
+        user: this.userMatcher(userId),
+        type: { $ne: 'career_recommendation' },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
 
     this.logger.log(
       'Found ' +
@@ -293,50 +207,40 @@ export class StudentDashboardService {
     );
 
     if (!content.length) {
-      const newRec = await this.fetchAndSaveRecommendations(student, token);
-      content = newRec ? [newRec] : [];
       this.logger.log(
-        'Generated new educational content for student ' + student._id,
+        `No educational content yet for student ${student._id}. ` +
+          `Content will be generated after quiz submission.`,
       );
-    } else {
-      // Ensure we're getting all educational content that has proper data
-      // Check if the first item has minimal content and if there are multiple items
-      if (
-        content.length > 1 &&
-        (!content[0].books || content[0].books.length === 0) &&
-        (!content[0].games || content[0].games.length === 0) &&
-        (!content[0].videoUrl || content[0].videoUrl.length < 2)
-      ) {
-        // If the latest content is minimal and older content exists, try to merge them
-        this.logger.log(
-          'Merging educational content for student ' + student._id,
-        );
-
-        // Find the most comprehensive content
-        let bestContent = content[0];
-        for (const item of content) {
-          // Count the total elements across all content types
-          const totalElements =
-            (item.videoUrl?.length || 0) +
-            (item.books?.length || 0) +
-            (item.games?.length || 0);
-
-          const bestTotalElements =
-            (bestContent.videoUrl?.length || 0) +
-            (bestContent.books?.length || 0) +
-            (bestContent.games?.length || 0);
-
-          if (totalElements > bestTotalElements) {
-            bestContent = item;
-          }
-        }
-
-        // Return the most comprehensive content
-        return [bestContent];
-      }
+      return [];
     }
 
-    return content;
+    const normalised = content.map((d) => this.normaliseContent(d));
+
+    if (normalised.length === 1) return normalised;
+
+    const best = normalised.reduce((prev, curr) =>
+      this.contentScore(curr) > this.contentScore(prev) ? curr : prev,
+    );
+
+    this.logger.log(
+      `Returning best content doc (score ${this.contentScore(best)}) for student ${userId}`,
+    );
+
+    return [best];
+  }
+
+  async getCareerRecommendation(student: User) {
+    const rec = await this.careerRecService.getRecommendationForUser(
+      student._id.toString(),
+    );
+
+    if (!rec) {
+      throw new NotFoundException(
+        'No career recommendation found. Please complete the career assessment quiz first.',
+      );
+    }
+
+    return rec;
   }
 
   async getEducationalContent(
@@ -345,71 +249,92 @@ export class StudentDashboardService {
     return this.eduContentModel.findById(contentId).exec();
   }
 
-  /**
-   * Create default educational content as fallback
-   */
-  private async createDefaultContent(student: User) {
-    try {
-      const defaultContent = {
-        videoUrl: [
-          {
-            title: 'Introduction to Programming with Scratch',
-            url: 'https://www.youtube.com/watch?v=jXUZaf5D12A',
-          },
-          {
-            title: 'Simple Science Experiments for Kids',
-            url: 'https://www.youtube.com/watch?v=4MHn9Q5NtdY',
-          },
-          {
-            title: 'Fun Math Games for Kids',
-            url: 'https://www.youtube.com/watch?v=DnFrOetuUKg',
-          },
-        ],
-        books: [
-          {
-            title: 'Hello Ruby: Adventures in Coding',
-            author: 'Linda Liukas',
-            level: 'Beginner',
-            theme: 'Programming',
-          },
-          {
-            title: 'The Secret Garden',
-            author: 'Frances Hodgson Burnett',
-            level: 'Intermediate',
-            theme: 'Fiction',
-          },
-        ],
-        games: [
-          {
-            name: 'CodeCombat',
-            url: 'https://codecombat.com/',
-            skill: 'Programming',
-          },
-          {
-            name: 'Scratch Junior',
-            url: 'https://www.scratchjr.org/',
-            skill: 'Programming',
-          },
-        ],
-        user: student._id,
-      };
+  async markContentItemCompleted(
+    student: User,
+    educationalContentId: string,
+    contentType: 'video' | 'book' | 'game',
+    contentIndex: number,
+    timeSpentSeconds?: number,
+  ): Promise<{ content: EducationalContent; progress: any }> {
+    const content = await this.eduContentModel
+      .findById(educationalContentId)
+      .exec();
 
-      const savedContent = await this.eduContentModel.create(defaultContent);
-
-      // Update the user to link to this educational content
-      await this.userModel.findByIdAndUpdate(
-        student._id,
-        { $addToSet: { educationalContents: savedContent._id } },
-        { new: true },
-      );
-
-      return savedContent;
-    } catch (fallbackError) {
-      this.logger.error(
-        `Failed to create default content: ${fallbackError.message}`,
-        fallbackError.stack,
-      );
-      return null;
+    if (!content) {
+      throw new NotFoundException('Educational content not found');
     }
+
+    const fieldMap: Record<string, string> = {
+      video: 'videos',
+      book: 'books',
+      game: 'games',
+    };
+
+    const field = fieldMap[contentType];
+    const items: any[] = (content as any)[field] ?? [];
+
+    if (contentIndex < 0 || contentIndex >= items.length) {
+      throw new NotFoundException(
+        `${contentType} at index ${contentIndex} not found`,
+      );
+    }
+
+    const contentTitle =
+      items[contentIndex]?.title || items[contentIndex]?.name;
+
+    // Mark completed on the content doc
+    items[contentIndex] = { ...items[contentIndex], completed: true };
+    (content as any)[field] = items;
+    content.markModified(field);
+    await content.save();
+
+    // Record in progress tracker
+    const progress = await this.learningProgressService.recordCompletion({
+      userId: student._id.toString(),
+      contentId: educationalContentId,
+      contentType,
+      contentIndex,
+      contentTitle,
+      timeSpentSeconds,
+    });
+
+    this.logger.log(
+      `Marked ${contentType}[${contentIndex}] completed for student ${student._id}`,
+    );
+
+    return { content, progress };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────────────────────
+  private userMatcher(userId: string): { $in: any[] } {
+    try {
+      return { $in: [userId, new Types.ObjectId(userId)] };
+    } catch {
+      return { $in: [userId] };
+    }
+  }
+
+  private normaliseContent(doc: any): any {
+    const raw = doc.toObject ? doc.toObject() : doc;
+    return {
+      ...raw,
+      // Prefer the schema field name; fall back to the AI service field name
+      videoUrl: raw.videoUrl?.length ? raw.videoUrl : (raw.videos ?? []),
+      videos: raw.videos?.length ? raw.videos : (raw.videoUrl ?? []),
+      books: raw.books ?? [],
+      games: raw.games ?? [],
+      resources: raw.resources ?? [],
+    };
+  }
+
+  private contentScore(doc: any): number {
+    return (
+      (doc.videoUrl?.length || 0) +
+      (doc.videos?.length || 0) +
+      (doc.books?.length || 0) +
+      (doc.games?.length || 0)
+    );
   }
 }

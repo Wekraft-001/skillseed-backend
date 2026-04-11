@@ -19,6 +19,8 @@ import {
   PostSchema,
   LearningProgress,
   LearningProgressSchema,
+  CareerRecommendation,
+  CareerRecommendationSchema,
 } from 'src/modules/schemas';
 import { LoggerModule } from 'src/common/logger/logger.module';
 import { AiGatewayModule } from 'src/modules/ai-gateway/ai-gateway.module';
@@ -34,6 +36,7 @@ import { CommunityPostsController } from '../controllers/community-posts.control
 import { PostsService } from '../services/posts.service';
 import { RewardsModule } from 'src/modules/rewards/rewards.module';
 import { LearningProgressService } from '../services/learning-progress.service';
+import { CareerRecommendationService } from '../services/career-recommendation.service';
 
 @Module({
   imports: [
@@ -47,6 +50,7 @@ import { LearningProgressService } from '../services/learning-progress.service';
       { name: CompletedChallenge.name, schema: CompletedChallengeSchema },
       { name: Post.name, schema: PostSchema },
       { name: LearningProgress.name, schema: LearningProgressSchema },
+      { name: CareerRecommendation.name, schema: CareerRecommendationSchema },
     ]),
     LoggerModule,
     AiGatewayModule,
@@ -66,7 +70,12 @@ import { LearningProgressService } from '../services/learning-progress.service';
     CompletedChallengesService,
     PostsService,
     LearningProgressService,
+    CareerRecommendationService,
   ],
-  exports: [StudentDashboardService, LearningProgressService],
+  exports: [
+    StudentDashboardService,
+    LearningProgressService,
+    CareerRecommendationService,
+  ],
 })
 export class StudentDashboardModule {}

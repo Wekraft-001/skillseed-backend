@@ -70,47 +70,6 @@ export class StudentDashboardController {
     return this.studentDashboardService.getDashboardData(student, token);
   }
 
-  @Get('initial-quiz')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get initial career assessment quiz for student' })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Returns the initial quiz if not completed, or completed quiz data if already taken',
-  })
-  async getInitialQuiz(@CurrentUser() student: User) {
-    return this.studentDashboardService.getInitialQuiz(student);
-  }
-
-  @Post('initial-quiz/submit')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Submit answers for initial career assessment quiz',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns quiz analysis and personalized recommendations',
-  })
-  async submitInitialQuiz(
-    @CurrentUser() student: User,
-    @Body()
-    answers: { phaseIndex: number; questionIndex: number; answer: string }[],
-    @Req() req: Request,
-  ) {
-    const quiz = await this.studentDashboardService.getInitialQuiz(student);
-    if (!quiz) {
-      throw new NotFoundException('Initial quiz not found');
-    }
-
-    const token = this.getTokenFromRequest(req);
-    return this.studentDashboardService.submitQuizAnswers(
-      student,
-      quiz.id,
-      answers,
-      token,
-    );
-  }
-
   @Get('recommendations')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -144,69 +103,73 @@ export class StudentDashboardController {
       },
     },
   })
-  async completeEducationalContent(
-    @CurrentUser() student: User,
-    @Param('id') educationalContentId: string,
+  async markCompleted(
+    @Param('contentId') contentId: string,
     @Body()
-    payload: { contentType: 'video' | 'book' | 'game'; contentIndex: number },
+    body: {
+      contentType: 'video' | 'book' | 'game';
+      contentIndex: number;
+      timeSpentSeconds?: number;
+    },
+    @CurrentUser() student: User,
   ) {
-    // Check if the educational content exists and belongs to the student
-    const content =
-      await this.studentDashboardService.getEducationalContent(
-        educationalContentId,
-      );
-
-    if (
-      !content ||
-      content.user.toString() !== (student as any)._id.toString()
-    ) {
-      throw new NotFoundException(
-        'Educational content not found or does not belong to you',
-      );
-    }
-
-    // Award a star for completion
-    const star = await this.rewardsService.completeEducationalContent(
-      (student as any)._id,
-      educationalContentId,
-      payload.contentType,
-      payload.contentIndex,
+    return this.studentDashboardService.markContentItemCompleted(
+      student,
+      contentId,
+      body.contentType,
+      body.contentIndex,
+      body.timeSpentSeconds,
     );
+  }
 
-    await this.learningProgressService.onEducationalContentCompleted(
-      (student as any)._id.toString(),
-      payload.contentType,
+  @Get('progress')
+  @ApiBearerAuth()
+  async getLearningProgress(@CurrentUser() student: User) {
+    return this.learningProgressService.getSummaryForUser(
+      student._id.toString(),
     );
-
-    return {
-      message: `${payload.contentType} marked as completed successfully`,
-      star,
-    };
+  }
+  
+  @Get('career-recommendation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Get the student's saved career recommendation",
+    description:
+      'Returns the persisted career recommendation generated after quiz submission. ' +
+      'Does NOT re-run analysis — reads directly from DB. ' +
+      'Returns 404 if the student has not yet completed the career assessment quiz.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No career recommendation found — quiz not yet completed',
+  })
+  async getCareerRecommendation(@CurrentUser() student: User) {
+    return this.studentDashboardService.getCareerRecommendation(student);
   }
 
   // ───Learning Journey endpoint ─────────────────────────────────────
-  @Get('learning-journey')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary:
-      "Get the student's learning journey stats (reading, videos, problem solving, streak)",
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns learning journey progress and streak data',
-    schema: {
-      example: {
-        streak: 5,
-        longestStreak: 12,
-        reading: { completed: 15, target: 20, percentage: 75 },
-        videos: { watched: 8, target: 10, percentage: 80 },
-        problemSolving: { completed: 12, target: 15, percentage: 80 },
-      },
-    },
-  })
-  async getLearningJourney(@CurrentUser() student: User) {
-    return this.learningProgressService.getLearningJourney(
-      (student as any)._id.toString(),
-    );
-  }
+  // @Get('learning-journey')
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOperation({
+  //   summary:
+  //     "Get the student's learning journey stats (reading, videos, problem solving, streak)",
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Returns learning journey progress and streak data',
+  //   schema: {
+  //     example: {
+  //       streak: 5,
+  //       longestStreak: 12,
+  //       reading: { completed: 15, target: 20, percentage: 75 },
+  //       videos: { watched: 8, target: 10, percentage: 80 },
+  //       problemSolving: { completed: 12, target: 15, percentage: 80 },
+  //     },
+  //   },
+  // })
+  // async getLearningJourney(@CurrentUser() student: User) {
+  //   return this.learningProgressService.getLearningJourney(
+  //     (student as any)._id.toString(),
+  //   );
+  // }
 }
