@@ -130,4 +130,41 @@ export class LearningProgressService {
 
     return max;
   }
+
+  async getLearningJourney(userId: string) {
+    // For now, return a safe default structure
+    // You can later connect this to real progress tracking logic
+
+    return {
+      streak: 0,
+      reading: {
+        completed: 0,
+        target: 5,
+        percentage: 0,
+      },
+      videos: {
+        watched: 0,
+        target: 5,
+        percentage: 0,
+      },
+      problemSolving: {
+        completed: 0,
+        target: 5,
+        percentage: 0,
+      },
+    };
+  }
+
+  async onChallengeCompleted(userId: string) {
+    // Hook for updating streaks, progress, rewards, etc.
+
+    this.logger.log(`Challenge completed for user ${userId}`);
+
+    // Example (future logic):
+    // - increment streak
+    // - update progress metrics
+    // - trigger rewards
+
+    return true;
+  }
 }
