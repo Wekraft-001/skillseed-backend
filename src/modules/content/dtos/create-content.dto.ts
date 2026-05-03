@@ -17,6 +17,7 @@ export enum TargetAudience {
   PARENT = 'parent',
   SCHOOL = 'school',
   MENTOR = 'mentor',
+  STUDENT = 'student',
   ALL = 'all',
 }
 

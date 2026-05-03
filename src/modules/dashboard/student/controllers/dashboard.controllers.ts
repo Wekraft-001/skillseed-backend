@@ -84,30 +84,72 @@ export class StudentDashboardController {
     return this.studentDashboardService.getRecommendations(student, token);
   }
 
+  // @Post('recommendations/:id/complete')
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOperation({
+  //   summary: 'Mark educational content as completed and earn a star',
+  // })
+  // @ApiParam({ name: 'id', description: 'Educational content ID' })
+  // @ApiBody({
+  //   schema: {
+  //     type: 'object',
+  //     required: ['contentType', 'contentIndex'],
+  //     properties: {
+  //       contentType: { type: 'string', enum: ['video', 'book', 'game'] },
+  //       contentIndex: {
+  //         type: 'number',
+  //         description: 'Index of the content item in the array',
+  //       },
+  //     },
+  //   },
+  // })
+  // async markCompleted(
+  //   @Param('contentId') contentId: string,
+  //   @Body()
+  //   body: {
+  //     contentType: 'video' | 'book' | 'game';
+  //     contentIndex: number;
+  //     timeSpentSeconds?: number;
+  //   },
+  //   @CurrentUser() student: User,
+  // ) {
+  //   return this.studentDashboardService.markContentItemCompleted(
+  //     student,
+  //     contentId,
+  //     body.contentType,
+  //     body.contentIndex,
+  //     body.timeSpentSeconds,
+  //   );
+  // }
+
   @Post('recommendations/:id/complete')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Mark educational content as completed and earn a star',
+    summary: 'Mark a video or book as completed and earn a star',
   })
-  @ApiParam({ name: 'id', description: 'Educational content ID' })
+  @ApiParam({ name: 'id', description: 'Educational content document ID' })
   @ApiBody({
     schema: {
       type: 'object',
       required: ['contentType', 'contentIndex'],
       properties: {
-        contentType: { type: 'string', enum: ['video', 'book', 'game'] },
+        contentType: { type: 'string', enum: ['video', 'book'] },
         contentIndex: {
           type: 'number',
-          description: 'Index of the content item in the array',
+          description: 'Index of the item in its array',
+        },
+        timeSpentSeconds: {
+          type: 'number',
+          description: 'Optional — seconds spent on content',
         },
       },
     },
   })
   async markCompleted(
-    @Param('contentId') contentId: string,
+    @Param('id') contentId: string, // ← was @Param('contentId') which never matched :id
     @Body()
     body: {
-      contentType: 'video' | 'book' | 'game';
+      contentType: 'video' | 'book';
       contentIndex: number;
       timeSpentSeconds?: number;
     },

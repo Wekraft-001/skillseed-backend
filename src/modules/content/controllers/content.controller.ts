@@ -66,6 +66,7 @@ export class ContentController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(
+    UserRole.STUDENT,
     UserRole.PARENT,
     UserRole.SCHOOL_ADMIN,
     UserRole.MENTOR,

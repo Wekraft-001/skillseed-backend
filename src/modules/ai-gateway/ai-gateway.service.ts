@@ -1,8 +1,21 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { Types } from 'mongoose';
 import { QuizDataService } from './quiz-data.service';
+
+// How long to wait for the AI microservice on each request type
+const TIMEOUT = {
+  DEFAULT: 10_000, // 10 s — fast reads
+  AI_PROCESSING: 60_000, // 60 s — anything that calls OpenAI
+  HEALTH: 5_000, // 5 s — health probes only
+} as const;
 
 @Injectable()
 export class AiGatewayService {
@@ -14,529 +27,398 @@ export class AiGatewayService {
     private readonly configService: ConfigService,
     private readonly quizDataService: QuizDataService,
   ) {
-    this.aiServiceUrl = this.configService.get<string>('AI_SERVICE_URL') || 'http://localhost:3001';
+    this.aiServiceUrl =
+      this.configService.get<string>('AI_SERVICE_URL') ||
+      'http://localhost:3001';
   }
 
-  // Forward quiz creation request to AI microservice
-  async createQuiz(userId: string, ageRange: string, token: string) {
-    try {
-      this.logger.log(`Creating quiz for user ${userId} with age range ${ageRange}`);
-      
-      this.logger.debug(`Sending request to AI service: ${this.aiServiceUrl}/api/ai/quiz`);
-      this.logger.debug(`Request body: ${JSON.stringify({ userId, ageRange })}`);
-      
-      let useLocalFallback = false;
-      let response;
-      
-      try {
-        response = await firstValueFrom(
-          this.httpService.post(
-            `${this.aiServiceUrl}/api/ai/quiz`,
-            { userId, ageRange },
-            { 
-              headers: { Authorization: `Bearer ${token}` },
-              timeout: 10000 // 10 second timeout
-            }
-          )
-        );
-        
-        // Check if the response has empty questions and log a warning
-        if (response?.data?.quiz?.questions && response.data.quiz.questions.length === 0) {
-          this.logger.warn('Received quiz with empty questions from AI service');
-          this.logger.debug(`Full response: ${JSON.stringify(response.data)}`);
-          useLocalFallback = true;
-        }
-      } catch (serviceError) {
-        this.logger.warn(`AI service unavailable or returned error: ${serviceError.message}`);
-        useLocalFallback = true;
-      }
-      
-      // Use local fallback if AI service is unavailable or returned empty questions
-      if (useLocalFallback) {
-        this.logger.log('Using local quiz data service as fallback');
-        const quizData = this.quizDataService.loadQuizData(ageRange);
-        
-        // Create a response structure similar to what the AI service would return
-        return {
-          success: true,
-          message: 'Quiz created successfully (using fallback)',
-          quiz: {
-            _id: `local_${new Date().getTime()}_${userId}`,
-            userId,
-            ageRange,
-            questions: quizData.questions,
-            createdAt: new Date().toISOString(),
-            submitted: false
-          }
-        };
-      }
-      
-      return response.data;
-    } catch (error) {
-      this.logger.error('Failed to create quiz via AI service and fallback', error);
-      
-      if (error.response) {
-        this.logger.error(`Error response status: ${error.response.status}`);
-        this.logger.error(`Error response data: ${JSON.stringify(error.response.data)}`);
-      }
-      
-      throw new BadRequestException(`Failed to create quiz: ${error.message}`);
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Validate a quizId string.
+   * Returns the id unchanged when valid, or null when it is absent / malformed.
+   * We never pad or mutate an invalid id — callers treat null as "use latest quiz".
+   */
+  private sanitizeQuizId(quizId: string | undefined | null): string | null {
+    if (!quizId) return null;
+
+    // A valid MongoDB ObjectId is exactly 24 hex characters
+    if (Types.ObjectId.isValid(quizId) && quizId.length === 24) {
+      return quizId;
     }
+
+    this.logger.warn(
+      `Malformed quizId received: "${quizId}" — will use latest quiz for this user instead`,
+    );
+    return null;
   }
 
-  // Forward quiz submission to AI microservice
-  async submitQuiz(quizData: any, token: string) {
+  /**
+   * Build a standard Authorization header object.
+   */
+  private authHeader(token: string) {
+    return { Authorization: `Bearer ${token}` };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quiz — authenticated
+  // ---------------------------------------------------------------------------
+
+  async createQuiz(userId: string, ageRange: string, token: string) {
+    this.logger.log(`Creating quiz for user ${userId}, ageRange=${ageRange}`);
+
     try {
-      this.logger.log(`Submitting quiz ${quizData.quizId}`);
-      
-      // Log the raw quiz data for debugging
-      this.logger.debug(`Raw quiz data: ${JSON.stringify(quizData)}`);
-      
-      // Create a copy of the data to avoid modifying the original
-      const processedData = { ...quizData };
-      
-      // Check if this is a locally generated quiz ID
-      const isLocalQuiz = processedData.quizId && processedData.quizId.startsWith('local_');
-      
-      // Ensure answers are properly structured for the AI microservice
-      if (Array.isArray(processedData.answers)) {
-        this.logger.debug(`Processing answers array with ${processedData.answers.length} items`);
-        
-        // Use our quiz data service to process the answers
-        try {
-          const processedAnswers = this.quizDataService.processAnswers(processedData.answers);
-          this.logger.debug(`Processed answers: ${JSON.stringify(processedAnswers)}`);
-          processedData.answers = processedAnswers;
-        } catch (processingError) {
-          this.logger.warn(`Error processing answers with quiz data service: ${processingError.message}`);
-          
-          // Fallback to manual processing if quiz data service fails
-          processedData.answers = processedData.answers.map((answer, index) => {
-            if (typeof answer === 'object' && answer !== null) {
-              return {
-                questionIndex: answer.questionIndex || index,
-                answer: answer.answer || 0
-              };
-            } else if (typeof answer === 'number') {
-              return answer;
-            } else {
-              return 0; // Default value
-            }
-          });
-        }
-      }
-      
-      this.logger.debug(`Processed quiz data: ${JSON.stringify(processedData)}`);
-      
-      // Ensure quiz ID is valid MongoDB ObjectId format (24 hex chars)
-      if (processedData.quizId && processedData.quizId.length < 24) {
-        this.logger.warn(`Quiz ID appears truncated: ${processedData.quizId}. Attempting to pad.`);
-        // If shorter than 24 characters, it might be truncated
-        processedData.quizId = processedData.quizId.padEnd(24, '0');
-        this.logger.log(`Padded quiz ID to: ${processedData.quizId}`);
-      }
-      
-      // If this was a locally generated quiz, handle it locally without calling the AI service
-      if (isLocalQuiz) {
-        this.logger.log('Processing local quiz submission without calling AI service');
-        
-        // Generate a simple analysis based on the answers
-        const averageScore = processedData.answers.reduce((sum, val) => sum + val, 0) / processedData.answers.length;
-        const strengths = averageScore > 1.5 ? ['Curious learner', 'Self-motivated'] : ['Practical thinker'];
-        
-        return {
-          success: true,
-          message: 'Quiz submitted successfully (local processing)',
-          analysis: {
-            strengths,
-            interests: ['Learning new skills', 'Exploring topics of interest'],
-            careerPaths: ['Education', 'Research', 'Technology'],
-            learningStyle: 'Mixed',
-            recommendations: {
-              books: [],
-              videos: [],
-              activities: []
-            }
-          }
-        };
-      }
-      
-      // Otherwise, call the AI microservice
       const response = await firstValueFrom(
         this.httpService.post(
-          `${this.aiServiceUrl}/api/ai/quiz/submit`,
-          processedData,
-          { 
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 60000 // 60 second timeout for quiz submissions which need AI processing
-          }
-        )
+          `${this.aiServiceUrl}/api/ai/quiz`,
+          { userId, ageRange },
+          { headers: this.authHeader(token), timeout: TIMEOUT.DEFAULT },
+        ),
       );
-      
+
+      // Treat an empty question list the same as a service failure
+      if (!response?.data?.quiz?.questions?.length) {
+        this.logger.warn(
+          'AI service returned a quiz with no questions — using local fallback',
+        );
+        return this.buildLocalQuiz(userId, ageRange);
+      }
+
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to submit quiz via AI service', error);
-      
-      if (error.response) {
-        this.logger.error(`Error response status: ${error.response.status}`);
-        this.logger.error(`Error response data: ${JSON.stringify(error.response.data)}`);
-      }
-      
-      // Generate a minimal fallback response if everything fails
-      return {
-        success: true,
-        message: 'Quiz submitted with basic analysis (fallback)',
-        analysis: {
-          strengths: ['Self-learning'],
-          interests: ['General learning'],
-          careerPaths: ['Various paths available'],
-          learningStyle: 'Mixed',
-          recommendations: {
-            message: 'Please try again later for personalized recommendations'
-          }
-        }
-      };
+      this.logger.warn(
+        `AI service unavailable, falling back to local quiz: ${error.message}`,
+      );
+      return this.buildLocalQuiz(userId, ageRange);
     }
   }
 
-  // Forward recommendations request to AI microservice
-  async getRecommendations(userId: string, token: string) {
-    try {
-      this.logger.log(`Getting recommendations for user ${userId}`);
-      
-      const response = await firstValueFrom(
-        this.httpService.get(
-          `${this.aiServiceUrl}/api/ai/recommendations?userId=${userId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
+  async submitQuiz(quizData: any, token: string) {
+    this.logger.log(`Submitting quiz — raw quizId: ${quizData.quizId}`);
+
+    const sanitizedQuizId = this.sanitizeQuizId(quizData.quizId);
+    const payload = {
+      ...quizData,
+      quizId: sanitizedQuizId, // null tells the AI service to resolve latest
+      answers: this.processAnswers(quizData.answers),
+    };
+
+    this.logger.debug(`Processed payload: ${JSON.stringify(payload)}`);
+
+    // Locally-generated quizzes cannot be submitted to the AI service because
+    // they were never persisted. Tell the client to retake the quiz properly.
+    if (this.isLocalQuizId(quizData.quizId)) {
+      throw new BadRequestException(
+        'This quiz was created offline and cannot be submitted. Please start a new quiz.',
       );
-      
+    }
+
+    const response = await firstValueFrom(
+      this.httpService.post(
+        `${this.aiServiceUrl}/api/ai/quiz/submit`,
+        payload,
+        { headers: this.authHeader(token), timeout: TIMEOUT.AI_PROCESSING },
+      ),
+    );
+
+    // Let HTTP errors propagate — the global exception filter will handle them
+    return response.data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recommendations — authenticated
+  // ---------------------------------------------------------------------------
+
+  async getRecommendations(userId: string, token: string) {
+    this.logger.log(`Getting recommendations for user ${userId}`);
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.aiServiceUrl}/api/ai/recommendations`,
+          { userId },
+          { headers: this.authHeader(token), timeout: TIMEOUT.AI_PROCESSING },
+        ),
+      );
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to get recommendations via AI service', error.message);
+      this.logger.error(`Failed to get recommendations: ${error.message}`);
       throw new NotFoundException('No recommendations found');
     }
   }
 
-  // Forward POST recommendations request to AI microservice
-  async postRecommendations(userId: string, analysisData: any, token: string) {
-    try {
-      this.logger.log(`Getting POST recommendations for user ${userId}`);
-      
-      // Process data before sending to the AI microservice
-      const processedData = { userId, ...analysisData };
-      
-      // Ensure quiz ID is valid MongoDB ObjectId format (24 hex chars) if present
-      if (processedData.quizId && processedData.quizId.length < 24) {
-        this.logger.warn(`Quiz ID appears truncated in recommendations request: ${processedData.quizId}. Attempting to pad.`);
-        processedData.quizId = processedData.quizId.padEnd(24, '0');
-        this.logger.log(`Padded quiz ID to: ${processedData.quizId}`);
-      }
-      
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.aiServiceUrl}/api/ai/recommendations`,
-          processedData,
-          { 
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 60000 // 60 second timeout for recommendations which need AI processing
-          }
-        )
-      );
-      
-      return response.data;
-    } catch (error) {
-      this.logger.error('Failed to get POST recommendations via AI service', error);
-      
-      if (error.response) {
-        this.logger.error(`Error response status: ${error.response.status}`);
-        this.logger.error(`Error response data: ${JSON.stringify(error.response.data)}`);
-      }
-      
-      throw new BadRequestException('Failed to get recommendations');
-    }
-  }
+  async getCareerRecommendations(
+    userId: string,
+    token: string,
+    quizId?: string,
+  ) {
+    this.logger.log(
+      `Getting career recommendations for user ${userId}, quizId=${quizId}`,
+    );
 
-  // Forward career recommendations request to AI microservice
-  async getCareerRecommendations(userId: string, token: string) {
     try {
-      this.logger.log(`Getting career recommendations for user ${userId}`);
-      
+      const params = new URLSearchParams({ userId });
+      if (quizId) params.append('quizId', quizId);
+
       const response = await firstValueFrom(
         this.httpService.get(
-          `${this.aiServiceUrl}/api/ai/career-recommendations?userId=${userId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
+          `${this.aiServiceUrl}/api/ai/career-recommendations?${params.toString()}`,
+          { headers: this.authHeader(token), timeout: TIMEOUT.AI_PROCESSING },
+        ),
       );
-      
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to get career recommendations via AI service', error.message);
+      this.logger.error(
+        `Failed to get career recommendations: ${error.message}`,
+      );
       throw new NotFoundException('No career recommendations found');
     }
   }
 
-  // Forward quiz analysis request to AI microservice
+  // ---------------------------------------------------------------------------
+  // Quiz analysis & content
+  // ---------------------------------------------------------------------------
+
   async getQuizAnalysis(userId: string, quizId: string, token: string) {
+    this.logger.log(
+      `Getting quiz analysis — userId=${userId}, quizId=${quizId}`,
+    );
+
+    const sanitizedQuizId = this.sanitizeQuizId(quizId);
+
     try {
-      this.logger.log(`Getting quiz analysis for user ${userId}, quiz ${quizId}`);
-      
       const response = await firstValueFrom(
-        this.httpService.get(
-          `${this.aiServiceUrl}/api/ai/quiz-analysis?userId=${userId}&quizId=${quizId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
+        this.httpService.post(
+          `${this.aiServiceUrl}/api/ai/quiz-analysis`,
+          { userId, quizId: sanitizedQuizId },
+          { headers: this.authHeader(token), timeout: TIMEOUT.DEFAULT },
+        ),
       );
-      
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to get quiz analysis via AI service', error.message);
+      this.logger.error(`Failed to get quiz analysis: ${error.message}`);
       throw new NotFoundException('Quiz analysis not found');
     }
   }
 
-  // Forward latest content request to AI microservice
   async getLatestContent(userId: string, token: string) {
+    this.logger.log(`Getting latest content for user ${userId}`);
+
     try {
-      this.logger.log(`Getting latest content for user ${userId}`);
-      
       const response = await firstValueFrom(
-        this.httpService.get(
-          `${this.aiServiceUrl}/api/ai/content/latest?userId=${userId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
+        this.httpService.post(
+          `${this.aiServiceUrl}/api/ai/content/latest`,
+          { userId },
+          { headers: this.authHeader(token), timeout: TIMEOUT.DEFAULT },
+        ),
       );
-      
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to get latest content via AI service', error.message);
+      this.logger.error(`Failed to get latest content: ${error.message}`);
       throw new NotFoundException('No content found');
     }
   }
 
-  // Guest quiz creation
+  // ---------------------------------------------------------------------------
+  // Guest flows
+  // ---------------------------------------------------------------------------
+
   async createGuestQuiz(sessionId: string, ageRange: string) {
+    this.logger.log(
+      `Creating guest quiz for session ${sessionId}, ageRange=${ageRange}`,
+    );
+
     try {
-      this.logger.log(`Creating guest quiz for session ${sessionId} with age range ${ageRange}`);
-      
-      let useLocalFallback = false;
-      let response;
-      
-      try {
-        response = await firstValueFrom(
-          this.httpService.post(
-            `${this.aiServiceUrl}/api/ai/guest/quiz`,
-            { sessionId, ageRange },
-            { timeout: 30000 } // Increased timeout for guest quiz creation
-          )
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.aiServiceUrl}/api/ai/guest/quiz`,
+          { sessionId, ageRange },
+          { timeout: TIMEOUT.DEFAULT },
+        ),
+      );
+
+      if (!response?.data?.quiz?.questions?.length) {
+        this.logger.warn(
+          'AI service returned a guest quiz with no questions — using local fallback',
         );
-        
-        // Check if the response has empty questions
-        if (response?.data?.quiz?.questions && response.data.quiz.questions.length === 0) {
-          this.logger.warn('Received guest quiz with empty questions from AI service');
-          useLocalFallback = true;
-        }
-      } catch (serviceError) {
-        this.logger.warn(`AI service unavailable or returned error: ${serviceError.message}`);
-        useLocalFallback = true;
+        return this.buildLocalGuestQuiz(sessionId, ageRange);
       }
-      
-      // Use local fallback if AI service is unavailable or returned empty questions
-      if (useLocalFallback) {
-        this.logger.log('Using local quiz data service as fallback for guest quiz');
-        const quizData = this.quizDataService.loadQuizData(ageRange);
-        
-        return {
-          success: true,
-          message: 'Guest quiz created successfully (using fallback)',
-          quiz: {
-            _id: `guest_local_${new Date().getTime()}_${sessionId}`,
-            sessionId,
-            ageRange,
-            questions: quizData.questions,
-            createdAt: new Date().toISOString(),
-            submitted: false
-          }
-        };
-      }
-      
+
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to create guest quiz via AI service and fallback', error.message);
-      throw new BadRequestException(`Failed to create guest quiz: ${error.message}`);
+      this.logger.warn(
+        `AI service unavailable for guest quiz, using local fallback: ${error.message}`,
+      );
+      return this.buildLocalGuestQuiz(sessionId, ageRange);
     }
   }
 
-  // Guest quiz submission
   async submitGuestQuiz(quizData: any) {
-    try {
-      this.logger.log(`Submitting guest quiz ${quizData.quizId}`);
-      
-      // Process answers using our quiz data service
-      if (Array.isArray(quizData.answers)) {
-        try {
-          const processedAnswers = this.quizDataService.processAnswers(quizData.answers);
-          quizData.answers = processedAnswers;
-        } catch (processingError) {
-          this.logger.warn(`Error processing guest quiz answers: ${processingError.message}`);
-        }
-      }
-      
-      // Check if this is a locally generated quiz ID
-      const isLocalQuiz = quizData.quizId && quizData.quizId.startsWith('guest_local_');
-      
-      // If local quiz, handle locally without calling the AI service
-      if (isLocalQuiz) {
-        this.logger.log('Processing local guest quiz submission without calling AI service');
-        
-        // Generate a simple analysis based on the answers
-        const averageScore = quizData.answers.reduce((sum, val) => sum + val, 0) / quizData.answers.length;
-        const strengths = averageScore > 1.5 ? ['Curious learner', 'Self-motivated'] : ['Practical thinker'];
-        
-        return {
-          success: true,
-          message: 'Guest quiz submitted successfully (local processing)',
-          analysis: {
-            strengths,
-            interests: ['Learning new skills', 'Exploring topics of interest'],
-            careerPaths: ['Education', 'Research', 'Technology'],
-            learningStyle: 'Mixed',
-            recommendations: {
-              books: [],
-              videos: [],
-              activities: []
-            }
-          }
-        };
-      }
-      
-      // Otherwise call the AI service
-      try {
-        const response = await firstValueFrom(
-          this.httpService.post(
-            `${this.aiServiceUrl}/api/ai/guest/quiz/submit`,
-            quizData,
-            { timeout: 60000 } // Increased timeout to match regular quiz submissions
-          )
-        );
-        
-        return response.data;
-      } catch (serviceError) {
-        this.logger.warn(`AI service error submitting guest quiz: ${serviceError.message}`);
-        
-        // Fallback response
-        return {
-          success: true,
-          message: 'Guest quiz submitted with basic analysis (fallback)',
-          analysis: {
-            strengths: ['Self-learning'],
-            interests: ['General learning'],
-            careerPaths: ['Various paths available'],
-            learningStyle: 'Mixed',
-            recommendations: {
-              message: 'Please try again later for personalized recommendations'
-            }
-          }
-        };
-      }
-    } catch (error) {
-      this.logger.error('Failed to submit guest quiz via AI service and fallback', error.message);
-      
-      // Return a minimal success response instead of throwing an error
-      return {
-        success: true,
-        message: 'Guest quiz submitted (minimal fallback)',
-        analysis: {
-          message: 'Analysis temporarily unavailable. Please try again later.'
-        }
-      };
+    this.logger.log(`Submitting guest quiz — raw quizId: ${quizData.quizId}`);
+
+    // Locally-generated guest quizzes were never persisted
+    if (this.isLocalQuizId(quizData.quizId)) {
+      throw new BadRequestException(
+        'This quiz was created offline and cannot be submitted. Please start a new quiz.',
+      );
     }
+
+    const sanitizedQuizId = this.sanitizeQuizId(quizData.quizId);
+    const payload = {
+      ...quizData,
+      quizId: sanitizedQuizId,
+      answers: this.processAnswers(quizData.answers),
+    };
+
+    const response = await firstValueFrom(
+      this.httpService.post(
+        `${this.aiServiceUrl}/api/ai/guest/quiz/submit`,
+        payload,
+        { timeout: TIMEOUT.AI_PROCESSING },
+      ),
+    );
+
+    return response.data;
   }
 
-  // Guest recommendations
   async getGuestRecommendations(sessionId: string, analysisData: any) {
+    this.logger.log(`Getting guest recommendations for session ${sessionId}`);
+
     try {
-      this.logger.log(`Getting guest recommendations for session ${sessionId}`);
-      
       const response = await firstValueFrom(
         this.httpService.post(
           `${this.aiServiceUrl}/api/ai/guest/recommendations`,
-          { sessionId, ...analysisData }
-        )
+          { sessionId, ...analysisData },
+          { timeout: TIMEOUT.AI_PROCESSING },
+        ),
       );
-      
       return response.data;
     } catch (error) {
-      this.logger.error('Failed to get guest recommendations via AI service', error.message);
+      this.logger.error(
+        `Failed to get guest recommendations: ${error.message}`,
+      );
       throw new BadRequestException('Failed to get guest recommendations');
     }
   }
 
-  // Test AI service health
-  async testAiService() {
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get(`${this.aiServiceUrl}/api/ai/test/youtube`)
-      );
-      
-      return {
-        status: 'healthy',
-        aiService: response.data,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      this.logger.error('AI service health check failed', error.message);
-      return {
-        status: 'unhealthy',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Health check
+  // ---------------------------------------------------------------------------
 
-  // Health check for AI Gateway and microservice connection
   async healthCheck() {
     const timestamp = new Date().toISOString();
-    let aiMicroserviceStatus = null;
+    let aiMicroserviceStatus: any;
     let overallStatus = 'healthy';
 
     try {
-      this.logger.debug(`Checking AI microservice health at ${this.aiServiceUrl}/api/ai/health`);
-      
-      // Check if AI microservice is accessible
       const response = await firstValueFrom(
-        this.httpService.get(`${this.aiServiceUrl}/api/ai/health`, { timeout: 5000 })
+        this.httpService.get(`${this.aiServiceUrl}/api/ai/health`, {
+          timeout: TIMEOUT.HEALTH,
+        }),
       );
-      
       aiMicroserviceStatus = response.data;
-      
     } catch (error) {
-      this.logger.error(`AI microservice health check failed: ${error.message}`);
-      
-      aiMicroserviceStatus = {
-        status: 'unavailable',
-        error: error.message
-      };
-      
+      this.logger.error(
+        `AI microservice health check failed: ${error.message}`,
+      );
+      aiMicroserviceStatus = { status: 'unavailable', error: error.message };
       overallStatus = 'degraded';
     }
-    
-    // Get AI Gateway configuration
-    const aiGateway = {
-      status: 'healthy',
-      version: '1.0.0',
-      environment: {
-        nodeEnv: process.env.NODE_ENV || 'development',
-        aiServiceUrl: this.aiServiceUrl
-      },
-      lastContactAttempt: timestamp
-    };
-    
+
     return {
       status: overallStatus,
       timestamp,
-      aiGateway,
-      aiMicroservice: aiMicroserviceStatus
+      aiGateway: {
+        status: 'healthy',
+        version: '1.0.0',
+        environment: {
+          nodeEnv: process.env.NODE_ENV || 'development',
+          aiServiceUrl: this.aiServiceUrl,
+        },
+      },
+      aiMicroservice: aiMicroserviceStatus,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns true for IDs that were generated locally (never persisted to DB).
+   */
+  private isLocalQuizId(quizId: string | undefined | null): boolean {
+    return !!(
+      quizId &&
+      (quizId.startsWith('local_') || quizId.startsWith('guest_local_'))
+    );
+  }
+
+  /**
+   * Normalise answers to a plain number[].
+   * Accepts both number[] and AnswerDto[] ({ questionIndex, answer }).
+   */
+  private processAnswers(answers: any[]): number[] {
+    if (!Array.isArray(answers)) return [];
+
+    try {
+      return this.quizDataService.processAnswers(answers);
+    } catch (error) {
+      this.logger.warn(
+        `QuizDataService.processAnswers failed, using manual normalisation: ${error.message}`,
+      );
+
+      return answers.map((a) => {
+        if (typeof a === 'number') return a;
+        if (typeof a === 'object' && a !== null && 'answer' in a) {
+          const v = Number(a.answer);
+          return isNaN(v) ? 0 : v;
+        }
+        return 0;
+      });
+    }
+  }
+
+  /**
+   * Build a local quiz response when the AI microservice is unavailable.
+   * The quiz ID is prefixed with "local_" so we can detect it on submission
+   * and reject it clearly rather than attempting to look it up in the DB.
+   */
+  private buildLocalQuiz(userId: string, ageRange: string) {
+    const quizData = this.quizDataService.loadQuizData(ageRange);
+    return {
+      success: true,
+      offline: true,
+      message:
+        'Quiz loaded from local data. Note: submission requires the AI service to be available.',
+      quiz: {
+        _id: `local_${Date.now()}_${userId}`,
+        userId,
+        ageRange,
+        questions: quizData.questions,
+        createdAt: new Date().toISOString(),
+        submitted: false,
+      },
+    };
+  }
+
+  private buildLocalGuestQuiz(sessionId: string, ageRange: string) {
+    const quizData = this.quizDataService.loadQuizData(ageRange);
+    return {
+      success: true,
+      offline: true,
+      message:
+        'Quiz loaded from local data. Note: submission requires the AI service to be available.',
+      quiz: {
+        _id: `guest_local_${Date.now()}_${sessionId}`,
+        sessionId,
+        ageRange,
+        questions: quizData.questions,
+        createdAt: new Date().toISOString(),
+        submitted: false,
+      },
     };
   }
 }

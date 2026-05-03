@@ -240,4 +240,18 @@ export class ParentDashboardController {
       childId,
     );
   }
+
+  @Get('children/:childId/insights')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get detailed engagement insights for a child' })
+  @ApiParam({ name: 'childId', description: 'Child MongoDB ObjectId' })
+  async getChildInsights(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ) {
+    return this.parentDashboardService.getChildOverview(
+      (user as any)._id.toString(),
+      childId,
+    );
+  }
 }

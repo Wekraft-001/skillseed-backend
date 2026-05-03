@@ -58,6 +58,7 @@ export interface ChildOverviewResponse {
     problemSolving: { completed: number; target: number; percentage: number };
   } | null;
   badges: BadgeSummary;
+  insights: string | null;
   lastActive: string | null;
 }
 
@@ -132,6 +133,7 @@ export class ParentChildOverviewService {
       completedChallenges,
       badges,
       learningJourney,
+      insights,
     ] = await Promise.all([
       this.careerRecService.getCareerProfileSummary(childId).catch(() => null),
       // this.getLatestQuiz(childId),
@@ -143,6 +145,9 @@ export class ParentChildOverviewService {
       this.rewardsService.getBadgesForUser(childId),
       this.learningProgressService
         .getLearningJourney(childId)
+        .catch(() => null),
+      this.learningProgressService
+        .getInsightsForParent(childId)
         .catch(() => null),
     ]);
 
@@ -166,6 +171,7 @@ export class ParentChildOverviewService {
       careerProfile,
       learningActivities,
       learningJourney,
+      insights,
       badges: badgeSummary,
       lastActive:
         learningJourney && learningJourney.streak > 0

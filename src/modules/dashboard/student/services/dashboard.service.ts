@@ -249,10 +249,66 @@ export class StudentDashboardService {
     return this.eduContentModel.findById(contentId).exec();
   }
 
+  // async markContentItemCompleted(
+  //   student: User,
+  //   educationalContentId: string,
+  //   contentType: 'video' | 'book' | 'game',
+  //   contentIndex: number,
+  //   timeSpentSeconds?: number,
+  // ): Promise<{ content: EducationalContent; progress: any }> {
+  //   const content = await this.eduContentModel
+  //     .findById(educationalContentId)
+  //     .exec();
+
+  //   if (!content) {
+  //     throw new NotFoundException('Educational content not found');
+  //   }
+
+  //   const fieldMap: Record<string, string> = {
+  //     video: 'videos',
+  //     book: 'books',
+  //     game: 'games',
+  //   };
+
+  //   const field = fieldMap[contentType];
+  //   const items: any[] = (content as any)[field] ?? [];
+
+  //   if (contentIndex < 0 || contentIndex >= items.length) {
+  //     throw new NotFoundException(
+  //       `${contentType} at index ${contentIndex} not found`,
+  //     );
+  //   }
+
+  //   const contentTitle =
+  //     items[contentIndex]?.title || items[contentIndex]?.name;
+
+  //   // Mark completed on the content doc
+  //   items[contentIndex] = { ...items[contentIndex], completed: true };
+  //   (content as any)[field] = items;
+  //   content.markModified(field);
+  //   await content.save();
+
+  //   // Record in progress tracker
+  //   const progress = await this.learningProgressService.recordCompletion({
+  //     userId: student._id.toString(),
+  //     contentId: educationalContentId,
+  //     contentType,
+  //     contentIndex,
+  //     contentTitle,
+  //     timeSpentSeconds,
+  //   });
+
+  //   this.logger.log(
+  //     `Marked ${contentType}[${contentIndex}] completed for student ${student._id}`,
+  //   );
+
+  //   return { content, progress };
+  // }
+
   async markContentItemCompleted(
     student: User,
     educationalContentId: string,
-    contentType: 'video' | 'book' | 'game',
+    contentType: 'video' | 'book', // removed 'game'
     contentIndex: number,
     timeSpentSeconds?: number,
   ): Promise<{ content: EducationalContent; progress: any }> {
@@ -267,7 +323,6 @@ export class StudentDashboardService {
     const fieldMap: Record<string, string> = {
       video: 'videos',
       book: 'books',
-      game: 'games',
     };
 
     const field = fieldMap[contentType];
@@ -280,15 +335,18 @@ export class StudentDashboardService {
     }
 
     const contentTitle =
-      items[contentIndex]?.title || items[contentIndex]?.name;
+      items[contentIndex]?.title ?? items[contentIndex]?.name;
 
-    // Mark completed on the content doc
-    items[contentIndex] = { ...items[contentIndex], completed: true };
+    items[contentIndex] = {
+      ...items[contentIndex],
+      completed: true,
+      completedAt: new Date(),
+      timeSpentSeconds: timeSpentSeconds ?? 0,
+    };
     (content as any)[field] = items;
     content.markModified(field);
     await content.save();
 
-    // Record in progress tracker
     const progress = await this.learningProgressService.recordCompletion({
       userId: student._id.toString(),
       contentId: educationalContentId,
@@ -304,7 +362,6 @@ export class StudentDashboardService {
 
     return { content, progress };
   }
-
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers
   // ─────────────────────────────────────────────────────────────────────────

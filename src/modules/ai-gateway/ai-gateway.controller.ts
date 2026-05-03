@@ -1,5 +1,20 @@
-import { Body, Controller, Get, Post, Query, UseGuards, Logger, Headers } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+  Logger,
+  Headers,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AiGatewayService } from './ai-gateway.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -12,7 +27,7 @@ import { UserRole } from 'src/common/interfaces';
 @ApiTags('AI Gateway')
 export class AiGatewayController {
   private readonly logger = new Logger(AiGatewayController.name);
-  
+
   constructor(private readonly aiGatewayService: AiGatewayService) {}
 
   // Signed-in student quiz creation
@@ -20,7 +35,9 @@ export class AiGatewayController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[AI Gateway] Create a quiz for a signed-in student' })
+  @ApiOperation({
+    summary: '[AI Gateway] Create a quiz for a signed-in student',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -36,7 +53,11 @@ export class AiGatewayController {
     @Headers('authorization') authorization: string,
   ) {
     const token = authorization?.replace('Bearer ', '');
-    return this.aiGatewayService.createQuiz((user as any)._id, body.ageRange, token);
+    return this.aiGatewayService.createQuiz(
+      (user as any)._id,
+      body.ageRange,
+      token,
+    );
   }
 
   // Signed-in student quiz submit
@@ -73,26 +94,29 @@ export class AiGatewayController {
   }
 
   // POST method for getting recommendations
-  @Post('recommendations')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.STUDENT)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '[AI Gateway] Get educational content recommendations for a student (POST method)' })
-  async postRecommendations(
-    @CurrentUser() user: User,
-    @Body() body: any,
-    @Headers('authorization') authorization: string,
-  ) {
-    const token = authorization?.replace('Bearer ', '');
-    return this.aiGatewayService.postRecommendations((user as any)._id, body, token);
-  }
+  // @Post('recommendations')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles(UserRole.STUDENT)
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: '[AI Gateway] Get educational content recommendations for a student (POST method)' })
+  // async postRecommendations(
+  //   @CurrentUser() user: User,
+  //   @Body() body: any,
+  //   @Headers('authorization') authorization: string,
+  // ) {
+  //   const token = authorization?.replace('Bearer ', '');
+  //   return this.aiGatewayService.postRecommendations((user as any)._id, body, token);
+  // }
 
   // GET method for getting recommendations
   @Get('recommendations')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[AI Gateway] Get educational content recommendations for a student' })
+  @ApiOperation({
+    summary:
+      '[AI Gateway] Get educational content recommendations for a student',
+  })
   async getRecommendations(
     @CurrentUser() user: User,
     @Headers('authorization') authorization: string,
@@ -106,13 +130,20 @@ export class AiGatewayController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[AI Gateway] Get career recommendations based on completed quiz' })
+  @ApiOperation({
+    summary: '[AI Gateway] Get career recommendations based on completed quiz',
+  })
   async getCareerRecommendations(
     @CurrentUser() user: User,
+    @Query('quizId') quizId: string,
     @Headers('authorization') authorization: string,
   ) {
     const token = authorization?.replace('Bearer ', '');
-    return this.aiGatewayService.getCareerRecommendations((user as any)._id, token);
+    return this.aiGatewayService.getCareerRecommendations(
+      (user as any)._id,
+      token,
+      quizId,
+    );
   }
 
   // Quiz analysis for debugging
@@ -120,14 +151,21 @@ export class AiGatewayController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[AI Gateway] Get raw quiz analysis for debugging (development only)' })
+  @ApiOperation({
+    summary:
+      '[AI Gateway] Get raw quiz analysis for debugging (development only)',
+  })
   async getQuizAnalysis(
     @CurrentUser() user: User,
     @Query('quizId') quizId: string,
     @Headers('authorization') authorization: string,
   ) {
     const token = authorization?.replace('Bearer ', '');
-    return this.aiGatewayService.getQuizAnalysis((user as any)._id, quizId, token);
+    return this.aiGatewayService.getQuizAnalysis(
+      (user as any)._id,
+      quizId,
+      token,
+    );
   }
 
   // Latest educational content
@@ -135,7 +173,9 @@ export class AiGatewayController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[AI Gateway] Get latest educational content for current student' })
+  @ApiOperation({
+    summary: '[AI Gateway] Get latest educational content for current student',
+  })
   async getLatestContent(
     @CurrentUser() user: User,
     @Headers('authorization') authorization: string,
@@ -163,7 +203,9 @@ export class AiGatewayController {
 
   // Guest quiz submission
   @Post('guest/quiz/submit')
-  @ApiOperation({ summary: '[AI Gateway] Submit answers for guest quiz and get analysis' })
+  @ApiOperation({
+    summary: '[AI Gateway] Submit answers for guest quiz and get analysis',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -179,13 +221,17 @@ export class AiGatewayController {
       required: ['quizId', 'sessionId', 'answers'],
     },
   })
-  async submitGuestQuiz(@Body() body: { quizId: string; sessionId: string; answers: number[] }) {
+  async submitGuestQuiz(
+    @Body() body: { quizId: string; sessionId: string; answers: number[] },
+  ) {
     return this.aiGatewayService.submitGuestQuiz(body);
   }
 
   // Guest recommendations
   @Post('guest/recommendations')
-  @ApiOperation({ summary: '[AI Gateway] Get guest recommendations after analysis' })
+  @ApiOperation({
+    summary: '[AI Gateway] Get guest recommendations after analysis',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -196,34 +242,42 @@ export class AiGatewayController {
       required: ['sessionId'],
     },
   })
-  async getGuestRecommendations(@Body() body: { sessionId: string; analysisData?: any }) {
-    return this.aiGatewayService.getGuestRecommendations(body.sessionId, body.analysisData || {});
+  async getGuestRecommendations(
+    @Body() body: { sessionId: string; analysisData?: any },
+  ) {
+    return this.aiGatewayService.getGuestRecommendations(
+      body.sessionId,
+      body.analysisData || {},
+    );
   }
 
   // Test AI service health (development only)
-  @Get('test/youtube')
-  @ApiOperation({ summary: '[AI Gateway] Test YouTube API integration (development only)' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'AI service health status',
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string' },
-        aiService: { type: 'object' },
-        timestamp: { type: 'string' }
-      }
-    }
-  })
-  async testAiService() {
-    return this.aiGatewayService.testAiService();
-  }
+  // @Get('test/youtube')
+  // @ApiOperation({ summary: '[AI Gateway] Test YouTube API integration (development only)' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'AI service health status',
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       status: { type: 'string' },
+  //       aiService: { type: 'object' },
+  //       timestamp: { type: 'string' }
+  //     }
+  //   }
+  // })
+  // async testAiService() {
+  //   return this.aiGatewayService.testAiService();
+  // }
 
   // Health check for AI Gateway and microservice connection
   @Get('health')
-  @ApiOperation({ summary: '[AI Gateway] Health check for AI Gateway and microservice connection' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiOperation({
+    summary:
+      '[AI Gateway] Health check for AI Gateway and microservice connection',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'AI Gateway health status and connection to AI microservice',
     schema: {
       type: 'object',
@@ -231,9 +285,9 @@ export class AiGatewayController {
         status: { type: 'string' },
         timestamp: { type: 'string' },
         aiGateway: { type: 'object' },
-        aiMicroservice: { type: 'object' }
-      }
-    }
+        aiMicroservice: { type: 'object' },
+      },
+    },
   })
   async healthCheck() {
     return this.aiGatewayService.healthCheck();

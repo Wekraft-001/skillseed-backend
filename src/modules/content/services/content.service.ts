@@ -138,6 +138,9 @@ export class ContentService {
 
       // Add audience based on user role
       switch (userRole) {
+        case UserRole.STUDENT:
+          targetAudience.push(TargetAudience.STUDENT);
+          break;
         case UserRole.PARENT:
           targetAudience.push(TargetAudience.PARENT);
           break;
@@ -150,6 +153,7 @@ export class ContentService {
         case UserRole.SUPER_ADMIN:
           targetAudience = [
             TargetAudience.ALL,
+            TargetAudience.STUDENT,
             TargetAudience.PARENT,
             TargetAudience.SCHOOL,
             TargetAudience.MENTOR,
