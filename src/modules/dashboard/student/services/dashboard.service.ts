@@ -79,96 +79,49 @@ export class StudentDashboardService {
   }> {
     let quiz: CareerQuiz | null = null;
 
-    // Debug: Log student object details
-    this.logger.log(`🔍 Checking quiz status for student ${student._id}`);
-    this.logger.log(
-      `📊 Student object keys: ${Object.keys(student).join(', ')}`,
-    );
-    this.logger.log(`🎯 initialQuizId: ${(student as any).initialQuizId}`);
-    this.logger.log(
-      `📋 quizzes array: ${JSON.stringify((student as any).quizzes)}`,
-    );
+    const userIdStr = student._id.toString();
+    let userQuery: any;
+    try {
+      userQuery = {
+        $in: [student._id, new Types.ObjectId(userIdStr), userIdStr],
+      };
+    } catch {
+      userQuery = { $in: [student._id, userIdStr] };
+    }
 
-    // First, try to find quiz using initialQuizId if it exists
+    // 1. Try initialQuizId first
     if ((student as any).initialQuizId) {
-      this.logger.log(
-        `🔎 Searching by initialQuizId: ${(student as any).initialQuizId}`,
-      );
       quiz = await this.quizModel
         .findById((student as any).initialQuizId)
         .exec();
-      this.logger.log(`📋 Quiz found by initialQuizId: ${!!quiz}`);
-      if (quiz) {
-        this.logger.log(
-          `✅ Quiz details: ID=${quiz._id}, completed=${quiz.completed}, user=${quiz.user}`,
-        );
-      }
     }
 
-    // If no quiz found by initialQuizId, try to find by user ID
+    // 2. Fallback: latest quiz by user — use $in to cover type mismatches
     if (!quiz) {
-      this.logger.log(`🔎 Searching by user ID: ${student._id}`);
       quiz = await this.quizModel
-        .findOne({
-          user: student._id,
-        })
+        .findOne({ user: userQuery })
         .sort({ createdAt: -1 })
         .exec();
-      this.logger.log(`📋 Quiz found by user ID: ${!!quiz}`);
-      if (quiz) {
-        this.logger.log(
-          `✅ Quiz details: ID=${quiz._id}, completed=${quiz.completed}, user=${quiz.user}`,
-        );
-      }
     }
 
-    // If still no quiz, try searching with quizzes array
-    if (
-      !quiz &&
-      (student as any).quizzes &&
-      (student as any).quizzes.length > 0
-    ) {
-      const latestQuizId = (student as any).quizzes[
-        (student as any).quizzes.length - 1
-      ];
-      this.logger.log(
-        `🔎 Searching by quizzes array, latest quiz ID: ${latestQuizId}`,
-      );
+    // 3. Fallback: quizzes array on student doc
+    if (!quiz && (student as any).quizzes?.length > 0) {
+      const latestQuizId = (student as any).quizzes.at(-1);
       quiz = await this.quizModel.findById(latestQuizId).exec();
-      this.logger.log(`📋 Quiz found by quizzes array: ${!!quiz}`);
-      if (quiz) {
-        this.logger.log(
-          `✅ Quiz details: ID=${quiz._id}, completed=${quiz.completed}, user=${quiz.user}`,
-        );
-      }
     }
 
     if (!quiz) {
-      this.logger.log(`❌ No career quiz found for student ${student._id}`);
-
-      // Debug: Check all quizzes in database
-      const allQuizzes = await this.quizModel.find({}).limit(3).exec();
-      this.logger.log(`🗄️ Total quizzes in DB: ${allQuizzes.length}`);
-      allQuizzes.forEach((q, index) => {
-        this.logger.log(
-          `📝 Quiz ${index + 1}: ID=${q._id}, user=${q.user}, completed=${q.completed}`,
-        );
-      });
-
-      return {
-        hasQuiz: false,
-        isCompleted: false,
-      };
+      return { hasQuiz: false, isCompleted: false };
     }
 
     this.logger.log(
-      `✅ Found career quiz ${quiz._id} for student ${student._id}, completed: ${quiz.completed}`,
+      `Found quiz ${quiz._id} for student ${student._id} — completed: ${quiz.completed}, submitted: ${(quiz as any).submitted}`,
     );
 
     return {
       hasQuiz: true,
-      isCompleted: quiz.completed,
-      quiz: quiz,
+      isCompleted: quiz.completed === true || (quiz as any).submitted === true,
+      quiz,
     };
   }
 

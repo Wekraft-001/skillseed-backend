@@ -42,9 +42,11 @@ export class StudentCommunitiesService {
       return communities.map((community) => ({
         ...community.toObject(),
         memberCount: community.members.length,
-        hasJoined: userId ? community.members.some(memberId => 
-          memberId.toString() === userId.toString()
-        ) : false
+        hasJoined: userId
+          ? community.members.some(
+              (memberId) => memberId.toString() === userId.toString(),
+            )
+          : false,
       }));
     } catch (error) {
       this.logger.error(
@@ -70,9 +72,12 @@ export class StudentCommunitiesService {
       return {
         ...community.toObject(),
         memberCount: community.members.length,
-        hasJoined: userId ? community.members.some(memberId => 
-          memberId.toString() === userId.toString()
-        ) : false
+        hasJoined: userId
+          ? community.members.some(
+              (member: any) =>
+                (member._id ?? member).toString() === userId.toString(),
+            )
+          : false,
       };
     } catch (error) {
       this.logger.error(
