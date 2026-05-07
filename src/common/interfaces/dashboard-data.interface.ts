@@ -38,6 +38,7 @@ export interface DashboardResponse extends DashboardData {
   //     success: true,
   //     message: 'Dashboard data retrieved successfully',
   // };
+  childrenCount?: number;
 }
 
 export interface SuperAdminDashboardResponse {}

@@ -135,10 +135,16 @@ export class ParentChildOverviewService {
       learningJourney,
       insights,
     ] = await Promise.all([
-      this.careerRecService.getCareerProfileSummary(childId).catch(() => null),
-      // this.getLatestQuiz(childId),
+      this.careerRecService
+        .getCareerProfileSummary(childId)
+        .then((rec) => {
+          if (rec && rec.quizCompleted) return rec;
+          return this.buildCareerProfileFromEduContent(childId);
+        })
+        .catch(() => this.buildCareerProfileFromEduContent(childId)),
       this.eduContentModel
-        .find({ user: new Types.ObjectId(childId) })
+        .find({ user: this.userMatcher(childId) })
+        .sort({ createdAt: -1 })
         .lean()
         .exec(),
       this.completedChallengeModel.find({ userId: childId }).lean().exec(),
@@ -209,6 +215,14 @@ export class ParentChildOverviewService {
 
   // ── Section builders ────────────────────────────────────────────────────
 
+  private userMatcher(userId: string) {
+    try {
+      return { $in: [userId, new Types.ObjectId(userId)] } as any;
+    } catch {
+      return { $in: [userId] } as any;
+    }
+  }
+
   private buildLearningActivities(
     completedChallenges: any[],
     eduContents: any[],
@@ -218,14 +232,14 @@ export class ParentChildOverviewService {
     let gamesPlayed = 0;
 
     for (const content of eduContents) {
-      booksCompleted += (content.books || []).filter(
-        (b: any) => b.completed,
+      booksCompleted += (content.books ?? []).filter(
+        (b: any) => b?.completed,
       ).length;
-      videosWatched += (content.videoUrl || []).filter(
-        (v: any) => v.completed,
+      videosWatched += (content.videoUrl ?? []).filter(
+        (v: any) => v?.completed,
       ).length;
-      gamesPlayed += (content.games || []).filter(
-        (g: any) => g.completed,
+      gamesPlayed += (content.games ?? []).filter(
+        (g: any) => g?.completed,
       ).length;
     }
 
@@ -257,5 +271,49 @@ export class ParentChildOverviewService {
       }));
 
     return { total: badges.length, recent };
+  }
+
+  private async buildCareerProfileFromEduContent(
+    childId: string,
+  ): Promise<CareerProfileSummary> {
+    const latestContent = await this.eduContentModel
+      .findOne({ user: this.userMatcher(childId) })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    if (!latestContent) {
+      return {
+        interests: [],
+        skills: [],
+        dreamJob: null,
+        quizCompleted: false,
+      };
+    }
+
+    const analysis = (latestContent as any).analysis ?? {};
+    const careerRec = (latestContent as any).careerRecommendation ?? {};
+
+    const interests: string[] =
+      analysis.topCareerAreas ??
+      (careerRec.careers as any[])?.map((c: any) => c.career ?? c) ??
+      [];
+
+    const skills: string[] =
+      analysis.aiAnalysis?.skills ??
+      (careerRec.traits as any[])?.map((t: any) => t.trait ?? t) ??
+      [];
+
+    const dreamJob: string | null =
+      analysis.topCareerAreas?.[0] ??
+      (careerRec.careers as any[])?.[0]?.career ??
+      null;
+
+    return {
+      interests,
+      skills,
+      dreamJob,
+      quizCompleted: !!(analysis.topCareerAreas?.length || dreamJob),
+    };
   }
 }

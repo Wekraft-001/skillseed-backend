@@ -49,28 +49,73 @@ export class ParentDashboardService {
     private emailService: EmailService,
   ) {}
 
+  // async getDashboardData(user: User): Promise<{
+  //   dashboardResponse: DashboardResponse;
+  //   // summary?: DashboardSummary;
+  //   // currentUser: User;
+  // }> {
+  //   try {
+  //     this.logger.log(
+  //       `Fetching dashboard data for user: ${user._id} with role: ${user.role}`,
+  //     );
+
+  //     const dashboardResponse: DashboardResponse = {
+  //       success: true,
+  //       message: 'Dashboard data retrieved successfully',
+  //       timestamp: new Date().toISOString(),
+  //       userId: String(user._id),
+  //       currentUser: user,
+  //     };
+
+  //     return {
+  //       dashboardResponse,
+  //       // currentUser: user,
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `Error fetching dashboard data for user: ${user._id}`,
+  //       error,
+  //     );
+  //     throw error;
+  //   }
+  // }
+
   async getDashboardData(user: User): Promise<{
     dashboardResponse: DashboardResponse;
-    // summary?: DashboardSummary;
-    // currentUser: User;
   }> {
     try {
+      const userIdStr = user._id.toString();
+      let userObjectId: Types.ObjectId | null = null;
+      try {
+        userObjectId = new Types.ObjectId(userIdStr);
+      } catch {}
+
+      const parentMatchers = userObjectId
+        ? [userIdStr, userObjectId]
+        : [userIdStr];
+
+      const childrenCount = await this.userModel.countDocuments({
+        role: UserRole.STUDENT,
+        $or: [
+          { parent: { $in: parentMatchers } },
+          { createdBy: { $in: parentMatchers } },
+        ],
+      });
+
       this.logger.log(
-        `Fetching dashboard data for user: ${user._id} with role: ${user.role}`,
+        `Parent ${userIdStr} has ${childrenCount} children (matchers: ${JSON.stringify(parentMatchers)})`,
       );
 
       const dashboardResponse: DashboardResponse = {
         success: true,
         message: 'Dashboard data retrieved successfully',
         timestamp: new Date().toISOString(),
-        userId: String(user._id),
+        userId: userIdStr,
         currentUser: user,
+        childrenCount,
       };
 
-      return {
-        dashboardResponse,
-        // currentUser: user,
-      };
+      return { dashboardResponse };
     } catch (error) {
       this.logger.error(
         `Error fetching dashboard data for user: ${user._id}`,
