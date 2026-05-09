@@ -15,12 +15,12 @@ import {
   ApiTags,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { AiGatewayService } from './ai-gateway.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { AiGatewayService } from '../services';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators';
-import { User } from '../schemas';
+import { User } from '../../schemas';
 import { UserRole } from 'src/common/interfaces';
 
 @Controller('ai')
@@ -30,7 +30,10 @@ export class AiGatewayController {
 
   constructor(private readonly aiGatewayService: AiGatewayService) {}
 
-  // Signed-in student quiz creation
+  // ---------------------------------------------------------------------------
+  // Quiz
+  // ---------------------------------------------------------------------------
+
   @Post('quiz')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -60,7 +63,6 @@ export class AiGatewayController {
     );
   }
 
-  // Signed-in student quiz submit
   @Post('quiz/submit')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -93,22 +95,10 @@ export class AiGatewayController {
     return this.aiGatewayService.submitQuiz(quizData, token);
   }
 
-  // POST method for getting recommendations
-  // @Post('recommendations')
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles(UserRole.STUDENT)
-  // @ApiBearerAuth()
-  // @ApiOperation({ summary: '[AI Gateway] Get educational content recommendations for a student (POST method)' })
-  // async postRecommendations(
-  //   @CurrentUser() user: User,
-  //   @Body() body: any,
-  //   @Headers('authorization') authorization: string,
-  // ) {
-  //   const token = authorization?.replace('Bearer ', '');
-  //   return this.aiGatewayService.postRecommendations((user as any)._id, body, token);
-  // }
+  // ---------------------------------------------------------------------------
+  // Recommendations
+  // ---------------------------------------------------------------------------
 
-  // GET method for getting recommendations
   @Get('recommendations')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -125,7 +115,10 @@ export class AiGatewayController {
     return this.aiGatewayService.getRecommendations((user as any)._id, token);
   }
 
+  // ---------------------------------------------------------------------------
   // Career recommendations
+  // ---------------------------------------------------------------------------
+
   @Get('career-recommendations')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -146,7 +139,10 @@ export class AiGatewayController {
     );
   }
 
-  // Quiz analysis for debugging
+  // ---------------------------------------------------------------------------
+  // Quiz analysis & content
+  // ---------------------------------------------------------------------------
+
   @Get('quiz-analysis')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -168,7 +164,6 @@ export class AiGatewayController {
     );
   }
 
-  // Latest educational content
   @Get('content/latest')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -184,93 +179,10 @@ export class AiGatewayController {
     return this.aiGatewayService.getLatestContent((user as any)._id, token);
   }
 
-  // Guest quiz creation
-  @Post('guest/quiz')
-  @ApiOperation({ summary: '[AI Gateway] Create a guest (anonymous) quiz' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        sessionId: { type: 'string', description: 'Guest session identifier' },
-        ageRange: { type: 'string', enum: ['6-8', '9-12', '13-15', '16-18'] },
-      },
-      required: ['sessionId', 'ageRange'],
-    },
-  })
-  async createGuestQuiz(@Body() body: { sessionId: string; ageRange: string }) {
-    return this.aiGatewayService.createGuestQuiz(body.sessionId, body.ageRange);
-  }
+  // ---------------------------------------------------------------------------
+  // Health check
+  // ---------------------------------------------------------------------------
 
-  // Guest quiz submission
-  @Post('guest/quiz/submit')
-  @ApiOperation({
-    summary: '[AI Gateway] Submit answers for guest quiz and get analysis',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        quizId: { type: 'string' },
-        sessionId: { type: 'string' },
-        answers: {
-          type: 'array',
-          items: { type: 'number' },
-          description: 'Array of answer indices',
-        },
-      },
-      required: ['quizId', 'sessionId', 'answers'],
-    },
-  })
-  async submitGuestQuiz(
-    @Body() body: { quizId: string; sessionId: string; answers: number[] },
-  ) {
-    return this.aiGatewayService.submitGuestQuiz(body);
-  }
-
-  // Guest recommendations
-  @Post('guest/recommendations')
-  @ApiOperation({
-    summary: '[AI Gateway] Get guest recommendations after analysis',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        sessionId: { type: 'string' },
-        analysisData: { type: 'object' },
-      },
-      required: ['sessionId'],
-    },
-  })
-  async getGuestRecommendations(
-    @Body() body: { sessionId: string; analysisData?: any },
-  ) {
-    return this.aiGatewayService.getGuestRecommendations(
-      body.sessionId,
-      body.analysisData || {},
-    );
-  }
-
-  // Test AI service health (development only)
-  // @Get('test/youtube')
-  // @ApiOperation({ summary: '[AI Gateway] Test YouTube API integration (development only)' })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'AI service health status',
-  //   schema: {
-  //     type: 'object',
-  //     properties: {
-  //       status: { type: 'string' },
-  //       aiService: { type: 'object' },
-  //       timestamp: { type: 'string' }
-  //     }
-  //   }
-  // })
-  // async testAiService() {
-  //   return this.aiGatewayService.testAiService();
-  // }
-
-  // Health check for AI Gateway and microservice connection
   @Get('health')
   @ApiOperation({
     summary:

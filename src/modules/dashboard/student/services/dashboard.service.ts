@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, CareerQuiz, EducationalContent } from 'src/modules/schemas';
 import { LoggerService } from 'src/common/logger/logger.service';
-import { AiGatewayService } from 'src/modules/ai-gateway/ai-gateway.service';
+import { AiGatewayService } from 'src/modules/ai-gateway/services';
 import { RewardsService } from 'src/modules/rewards/rewards.service';
 import { DashboardResponse, UserProfileDto } from 'src/common/interfaces';
 import { CareerRecommendationService } from './career-recommendation.service';

@@ -17,6 +17,43 @@ const TIMEOUT = {
   HEALTH: 5_000, // 5 s — health probes only
 } as const;
 
+// ---------------------------------------------------------------------------
+// Label → index maps for every age group.
+// These mirror AGE_SCALE_LABELS in ai-base.service.ts so the gateway can
+// convert human-readable answer labels back to numeric indices before
+// forwarding to the microservice.
+// ---------------------------------------------------------------------------
+const SCALE_LABEL_TO_INDEX: Record<string, Record<string, number>> = {
+  '6-8': {
+    '😞 Not at all': 0,
+    '😐 A little': 1,
+    '🙂 Sometimes': 2,
+    '😀 Often': 3,
+    '🤩 A lot': 4,
+  },
+  '9-12': {
+    Never: 0,
+    Rarely: 1,
+    Sometimes: 2,
+    Often: 3,
+    Always: 4,
+  },
+  '13-15': {
+    'Strongly Disagree': 0,
+    Disagree: 1,
+    Neutral: 2,
+    Agree: 3,
+    'Strongly Agree': 4,
+  },
+  '16-18': {
+    'Very Untrue': 0,
+    Untrue: 1,
+    Neutral: 2,
+    True: 3,
+    'Very True': 4,
+  },
+};
+
 @Injectable()
 export class AiGatewayService {
   private readonly logger = new Logger(AiGatewayService.name);
@@ -36,28 +73,15 @@ export class AiGatewayService {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Validate a quizId string.
-   * Returns the id unchanged when valid, or null when it is absent / malformed.
-   * We never pad or mutate an invalid id — callers treat null as "use latest quiz".
-   */
   private sanitizeQuizId(quizId: string | undefined | null): string | null {
     if (!quizId) return null;
-
-    // A valid MongoDB ObjectId is exactly 24 hex characters
-    if (Types.ObjectId.isValid(quizId) && quizId.length === 24) {
-      return quizId;
-    }
-
+    if (Types.ObjectId.isValid(quizId) && quizId.length === 24) return quizId;
     this.logger.warn(
       `Malformed quizId received: "${quizId}" — will use latest quiz for this user instead`,
     );
     return null;
   }
 
-  /**
-   * Build a standard Authorization header object.
-   */
   private authHeader(token: string) {
     return { Authorization: `Bearer ${token}` };
   }
@@ -78,7 +102,6 @@ export class AiGatewayService {
         ),
       );
 
-      // Treat an empty question list the same as a service failure
       if (!response?.data?.quiz?.questions?.length) {
         this.logger.warn(
           'AI service returned a quiz with no questions — using local fallback',
@@ -101,14 +124,10 @@ export class AiGatewayService {
     const sanitizedQuizId = this.sanitizeQuizId(quizData.quizId);
     const payload = {
       ...quizData,
-      quizId: sanitizedQuizId, // null tells the AI service to resolve latest
+      quizId: sanitizedQuizId,
       answers: this.processAnswers(quizData.answers),
     };
 
-    this.logger.debug(`Processed payload: ${JSON.stringify(payload)}`);
-
-    // Locally-generated quizzes cannot be submitted to the AI service because
-    // they were never persisted. Tell the client to retake the quiz properly.
     if (this.isLocalQuizId(quizData.quizId)) {
       throw new BadRequestException(
         'This quiz was created offline and cannot be submitted. Please start a new quiz.',
@@ -123,7 +142,6 @@ export class AiGatewayService {
       ),
     );
 
-    // Let HTTP errors propagate — the global exception filter will handle them
     return response.data;
   }
 
@@ -256,30 +274,41 @@ export class AiGatewayService {
   }
 
   async submitGuestQuiz(quizData: any) {
-    this.logger.log(`Submitting guest quiz — raw quizId: ${quizData.quizId}`);
+    this.logger.log(`Submitting guest quiz — quizId: ${quizData.quizId}`);
 
-    // Locally-generated guest quizzes were never persisted
-    if (this.isLocalQuizId(quizData.quizId)) {
+    if (!quizData.quizId) throw new BadRequestException('quizId is required');
+    if (!quizData.sessionId)
+      throw new BadRequestException('sessionId is required');
+    if (!Array.isArray(quizData.answers) || quizData.answers.length === 0) {
       throw new BadRequestException(
-        'This quiz was created offline and cannot be submitted. Please start a new quiz.',
+        'answers array is required and must not be empty',
       );
     }
 
     const sanitizedQuizId = this.sanitizeQuizId(quizData.quizId);
-    const payload = {
-      ...quizData,
-      quizId: sanitizedQuizId,
-      answers: this.processAnswers(quizData.answers),
-    };
+    const normalizedAnswers = this.processAnswers(
+      quizData.answers,
+      quizData.ageRange,
+    );
+
+    this.logger.debug(
+      `Guest submit — quizId: ${sanitizedQuizId}, answers: [${normalizedAnswers.join(', ')}]`,
+    );
 
     const response = await firstValueFrom(
       this.httpService.post(
         `${this.aiServiceUrl}/api/ai/guest/quiz/submit`,
-        payload,
+        {
+          quizId: sanitizedQuizId,
+          sessionId: quizData.sessionId,
+          answers: normalizedAnswers,
+        },
         { timeout: TIMEOUT.AI_PROCESSING },
       ),
     );
 
+    // The microservice already returns a clean profile-only response —
+    // pass it straight through without modification
     return response.data;
   }
 
@@ -309,7 +338,7 @@ export class AiGatewayService {
 
   async healthCheck() {
     const timestamp = new Date().toISOString();
-    let aiMicroserviceStatus: any;
+    let aiStatus: any;
     let overallStatus = 'healthy';
 
     try {
@@ -318,12 +347,12 @@ export class AiGatewayService {
           timeout: TIMEOUT.HEALTH,
         }),
       );
-      aiMicroserviceStatus = response.data;
+      aiStatus = response.data;
     } catch (error) {
       this.logger.error(
         `AI microservice health check failed: ${error.message}`,
       );
-      aiMicroserviceStatus = { status: 'unavailable', error: error.message };
+      aiStatus = { status: 'unavailable', error: error.message };
       overallStatus = 'degraded';
     }
 
@@ -338,7 +367,7 @@ export class AiGatewayService {
           aiServiceUrl: this.aiServiceUrl,
         },
       },
-      aiMicroservice: aiMicroserviceStatus,
+      aiMicroservice: aiStatus,
     };
   }
 
@@ -346,9 +375,6 @@ export class AiGatewayService {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Returns true for IDs that were generated locally (never persisted to DB).
-   */
   private isLocalQuizId(quizId: string | undefined | null): boolean {
     return !!(
       quizId &&
@@ -358,34 +384,67 @@ export class AiGatewayService {
 
   /**
    * Normalise answers to a plain number[].
-   * Accepts both number[] and AnswerDto[] ({ questionIndex, answer }).
+   *
+   * Handles all three shapes the frontend might send:
+   *   1. number[]                          → [3, 2, 4, ...]
+   *   2. { questionIndex, answer: number } → extract answer as number
+   *   3. { questionIndex, answer: string } → resolve label → index using ageRange scale,
+   *                                          or fall back to middle value (2) if unknown
    */
-  private processAnswers(answers: any[]): number[] {
+  private processAnswers(answers: any[], ageRange?: string): number[] {
     if (!Array.isArray(answers)) return [];
 
+    // Try the QuizDataService normaliser first (handles simple cases fast)
     try {
-      return this.quizDataService.processAnswers(answers);
-    } catch (error) {
-      this.logger.warn(
-        `QuizDataService.processAnswers failed, using manual normalisation: ${error.message}`,
+      const simple = this.quizDataService.processAnswers(answers);
+      // If every value came back as 0 but inputs weren't all 0, the labels
+      // weren't understood — fall through to the label resolver below.
+      const allZero = simple.every((v) => v === 0);
+      const inputAllZero = answers.every((a) =>
+        typeof a === 'number' ? a === 0 : Number(a?.answer) === 0,
       );
-
-      return answers.map((a) => {
-        if (typeof a === 'number') return a;
-        if (typeof a === 'object' && a !== null && 'answer' in a) {
-          const v = Number(a.answer);
-          return isNaN(v) ? 0 : v;
-        }
-        return 0;
-      });
+      if (!allZero || inputAllZero) return simple;
+    } catch {
+      // fall through
     }
+
+    // Full normaliser: handles label strings with optional ageRange lookup
+    const labelMap = ageRange ? SCALE_LABEL_TO_INDEX[ageRange] : undefined;
+
+    return answers.map((a) => {
+      // Plain number
+      if (typeof a === 'number') return a;
+
+      if (typeof a === 'object' && a !== null && 'answer' in a) {
+        const raw = a.answer;
+
+        // Numeric answer value
+        if (typeof raw === 'number') return raw;
+
+        // String — try to parse as number first
+        const asNum = Number(raw);
+        if (!isNaN(asNum)) return asNum;
+
+        // String label — look it up in the age-specific map
+        if (typeof raw === 'string') {
+          if (labelMap && raw in labelMap) return labelMap[raw];
+
+          // Try all scales as a last resort
+          for (const scale of Object.values(SCALE_LABEL_TO_INDEX)) {
+            if (raw in scale) return scale[raw];
+          }
+
+          this.logger.warn(
+            `Unknown answer label "${raw}" — defaulting to 2 (middle)`,
+          );
+          return 2; // safe middle-of-scale fallback
+        }
+      }
+
+      return 0;
+    });
   }
 
-  /**
-   * Build a local quiz response when the AI microservice is unavailable.
-   * The quiz ID is prefixed with "local_" so we can detect it on submission
-   * and reject it clearly rather than attempting to look it up in the DB.
-   */
   private buildLocalQuiz(userId: string, ageRange: string) {
     const quizData = this.quizDataService.loadQuizData(ageRange);
     return {
