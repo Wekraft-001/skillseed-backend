@@ -15,7 +15,11 @@ import { ParentDashboardService } from '../services/dashboard.service';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { CreateSubscriptionDto, UserRole } from 'src/common/interfaces';
+import {
+  CreateSubscriptionDto,
+  PaymentMethod,
+  UserRole,
+} from 'src/common/interfaces';
 import { CreateStudentDto, TempStudentDataDto } from 'src/modules/auth/dtos';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LoggerService } from 'src/common/logger/logger.service';
@@ -25,11 +29,13 @@ import { Model } from 'mongoose';
 import { CurrentUser } from 'src/common/decorators';
 import {
   ApiBadRequestResponse,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { SubscriptionService } from 'src/subscription/subscription.service';
 
 @Controller('parent/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,6 +44,7 @@ import {
 export class ParentDashboardController {
   constructor(
     private readonly parentDashboardService: ParentDashboardService,
+    private readonly subscriptionService: SubscriptionService,
     private readonly logger: LoggerService,
 
     @InjectModel(User.name)
@@ -152,6 +159,69 @@ export class ParentDashboardController {
       );
       throw error;
     }
+  }
+
+  @Post('subscriptions/:subscriptionId/renew')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Renew an existing child subscription',
+    description:
+      'Generates a new Flutterwave payment link to renew the specified subscription. ' +
+      'After the parent completes payment the webhook will activate the new subscription ' +
+      "and restore the child's login access.",
+  })
+  @ApiParam({
+    name: 'subscriptionId',
+    description: 'Subscription MongoDB ObjectId',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        paymentMethod: {
+          type: 'string',
+          enum: ['card', 'mobilemoney'],
+          description: 'Payment method for renewal (default: card)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Renewal payment link generated',
+    schema: {
+      example: {
+        message: 'Renewal payment link generated successfully',
+        paymentLink: 'https://checkout.flutterwave.com/v3/hosted/pay/...',
+        reference: 'renewal-uuid',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Subscription not found or does not belong to you',
+  })
+  async renewSubscription(
+    @CurrentUser() user: User,
+    @Param('subscriptionId') subscriptionId: string,
+    @Body() body: { paymentMethod?: 'card' | 'mobilemoney' },
+  ) {
+    const method =
+      body?.paymentMethod === 'mobilemoney'
+        ? PaymentMethod.MOBILE_MONEY
+        : PaymentMethod.CREDIT_CARD;
+
+    const result = await this.subscriptionService.renewSubscription(
+      subscriptionId,
+      (user as any)._id.toString(),
+      method,
+    );
+
+    return {
+      message: 'Renewal payment link generated successfully',
+      paymentLink: result.paymentLink,
+      reference: result.reference,
+    };
   }
 
   @Get('children/overview')

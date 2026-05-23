@@ -80,15 +80,8 @@ export class StudentDashboardService {
     let quiz: CareerQuiz | null = null;
 
     const userIdStr = student._id.toString();
-    let userQuery: any;
-    try {
-      userQuery = {
-        $in: [student._id, new Types.ObjectId(userIdStr), userIdStr],
-      };
-    } catch {
-      userQuery = { $in: [student._id, userIdStr] };
-    }
-
+    const userMatcher = { $in: [student._id, userIdStr] };
+    
     // 1. Try initialQuizId first
     if ((student as any).initialQuizId) {
       quiz = await this.quizModel
@@ -96,10 +89,10 @@ export class StudentDashboardService {
         .exec();
     }
 
-    // 2. Fallback: latest quiz by user — use $in to cover type mismatches
+    // 2. Fallback: latest quiz by user
     if (!quiz) {
       quiz = await this.quizModel
-        .findOne({ user: userQuery })
+        .findOne({ user: userMatcher })
         .sort({ createdAt: -1 })
         .exec();
     }

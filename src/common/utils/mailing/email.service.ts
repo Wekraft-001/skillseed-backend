@@ -1,11 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import { Subject } from 'rxjs';
-import { log } from 'winston';
+import {
+  credentialApprovedTemplate,
+  credentialRejectedTemplate,
+  mentorSuspensionTemplate,
+  mentorReactivationTemplate,
+  subscriptionExpiryWarningTemplate,
+  schoolOnboardingTemplate,
+  mentorOnboardingTemplate,
+  studentOnboardingParentTemplate,
+  studentOnboardingSchoolTemplate,
+  subscriptionExpiredTemplate,
+} from './template/index.template';
 
 @Injectable()
 export class EmailService {
-  private transporter;
+  private transporter: nodemailer.Transporter;
 
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -13,80 +23,60 @@ export class EmailService {
       port: Number(process.env.MAIL_PORT),
       auth: {
         user: process.env.MAIL_USER || 'api',
-        pass: process.env.MAIL_PASS || '7f608d469e261486705539e674a462dd',
+        pass: process.env.MAIL_PASS,
         authMethod: 'PLAIN,LOGIN',
-      },
+      } as any,
       tls: {
         rejectUnauthorized: process.env.MAIL_STARTTLS === 'true',
       },
-      debug: true,
     });
-    console.log('MAIL_USER:', process.env.MAIL_USER);
-    console.log('MAIL_PASS:', process.env.MAIL_PASS);
   }
 
-  async sendSchoolOnboardingEmail(email: string, password: string) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Your Skillseed School Account',
-      html: `
-        <p>Hi there,</p>
-        <p>Your school has been onboarded on Skillseed 🎉</p>
-        <p>Here are your login credentials:</p>
-        <ul>
-          <li><strong>Email:</strong> ${email}</li>
-          <li><strong>Password:</strong> ${password}</li>
-        </ul>
-        <p>You'll be asked to reset this password on first login.</p>
-        <p>Welcome aboard!</p>
-      `,
-    };
+  // ─── Private helper ────────────────────────────────────────────────────────
 
+  private async send(
+    to: string | string[],
+    subject: string,
+    html: string,
+  ): Promise<void> {
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email sent:', info.response);
+      const info = await this.transporter.sendMail({
+        from: process.env.MAIL_FROM,
+        to,
+        subject,
+        html,
+      });
+      console.log(
+        `✅ Email sent to ${Array.isArray(to) ? to.join(', ') : to}: ${info.response}`,
+      );
     } catch (error) {
-      console.error('❌ Failed to send email:', error);
+      console.error(`❌ Failed to send email to ${to}:`, error);
     }
+  }
+
+  // ─── Public methods ────────────────────────────────────────────────────────
+
+  async sendSchoolOnboardingEmail(
+    email: string,
+    password: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Your Skillseed School Account',
+      schoolOnboardingTemplate(email, password),
+    );
   }
 
   async sendMentorOnboardingEmail(
     firstName: string,
     email: string,
     password: string,
-  ) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Welcome to Skillseed – Your Mentor Account Details',
-      html: `
-      <p>Hi ${firstName},</p>
-      <p>Welcome to <strong>Skillseed</strong>! 🎉 We're thrilled to have you join our mentorship network.</p>
-    
-      <p>Here are your login credentials:</p>
-      <ul>
-        <li><strong>Email:</strong> ${email}</li>
-        <li><strong>Password:</strong> ${password}</li>
-      </ul>
-    
-      <p>You'll be prompted to reset your password the first time you log in to keep your account secure.</p>
-    
-      <p>As a mentor, you play a key role in shaping the experience of learners and supporting their growth. We're excited to see the impact you'll make!</p>
-    
-      <p>If you have any questions or need assistance, don’t hesitate to reach out to our support team.</p>
-    
-      <p>Let’s make learning meaningful,</p>
-      <p><strong>The Skillseed Team</strong></p>
-    `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send email:', error);
-    }
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Welcome to Skillseed – Your Mentor Account Details',
+      mentorOnboardingTemplate(firstName, email, password),
+    );
   }
 
   async sendStudentOnboardingEmailParent(
@@ -95,37 +85,17 @@ export class EmailService {
     password: string,
     username: string,
     dashboardUrl: string,
-  ) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: parentEmail,
-      subject: `Welcome to Skillseed – ${studentName}'s Account Details`,
-      html: `
-        <p>Hi there,</p>
-        <p>Your child <strong>${studentName}</strong> has been successfully registered on <strong>Skillseed</strong> 🎉</p>
-        
-        <p>Here are the login details for the student account:</p>
-        <ul>
-          <li><strong>Dashboard Link:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
-           <li><strong>Username:</strong> ${username} </li>
-          <li><strong>Password:</strong> ${password}</li>
-        </ul>
-  
-        <p>We recommend that your child updates this password after their first login for security.</p>
-        
-        <p>We’re excited to have ${studentName} onboard and can’t wait to see their learning journey grow 🚀</p>
-  
-        <p>Best regards,</p>
-        <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Student onboarding email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send student onboarding email:', error);
-    }
+  ): Promise<void> {
+    await this.send(
+      parentEmail,
+      `Welcome to Skillseed – ${studentName}'s Account Details`,
+      studentOnboardingParentTemplate(
+        studentName,
+        username,
+        password,
+        dashboardUrl,
+      ),
+    );
   }
 
   async sendStudentOnboardingEmailSchool(
@@ -135,92 +105,69 @@ export class EmailService {
     username: string,
     password: string,
     dashboardUrl: string,
-  ) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: [parentEmail, adminEmail],
-      subject: `Welcome to Skillseed – ${studentName}'s Account Details`,
-      html: `
-        <p>Hi there,</p>
-        <p>Your child <strong>${studentName}</strong> has been successfully registered on <strong>Skillseed</strong> 🎉</p>
-        
-        <p>Here are the login details for the student account:</p>
-        <ul>
-          <li><strong>Dashboard Link:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
-           <li><strong>Username:</strong> ${username} </li>
-          <li><strong>Password:</strong> ${password}</li>
-        </ul>
-  
-        <p>We recommend that your child updates this password after their first login for security.</p>
-        
-        <p>We’re excited to have ${studentName} onboard and can’t wait to see their learning journey grow 🚀</p>
-  
-        <p>Best regards,</p>
-        <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Student onboarding email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send student onboarding email:', error);
-    }
+  ): Promise<void> {
+    await this.send(
+      [parentEmail, adminEmail],
+      `Welcome to Skillseed – ${studentName}'s Account Details`,
+      studentOnboardingSchoolTemplate(
+        studentName,
+        username,
+        password,
+        dashboardUrl,
+      ),
+    );
   }
 
-  async sendExpiredSubscriptionEmail(email: string, firstName: string) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Your Subscription Has Expired',
-      html: `
-      <p>Hi ${firstName},</p>
-      <p>We noticed that your subscription has expired as of today.</p>
-      <p>If you'd like to renew and continue enjoying Skillseed, please log in to your account and update your payment details.</p>
-      <p>Let us know if you need any help.</p>
-      <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
+  async sendSubscriptionExpiredEmail(
+    parentEmail: string,
+    parentFirstName: string,
+    studentName: string,
+    renewUrl = 'https://app.wekraft.co/parent/dashboard/subscriptions',
+  ): Promise<void> {
+    await this.send(
+      parentEmail,
+      `Action Required: ${studentName}'s Skillseed Subscription Has Expired`,
+      subscriptionExpiredTemplate(parentFirstName, studentName, renewUrl),
+    );
+  }
 
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Expiration email sent:', info.response);
-    } catch (error) {
-      console.log('❌ Failed to send expiration email:', error);
-    }
+  async sendSubscriptionExpiryWarningEmail(
+    parentEmail: string,
+    parentFirstName: string,
+    studentName: string,
+    expiryDate: string,
+    renewUrl = 'https://app.wekraft.co/parent/dashboard/subscriptions',
+  ): Promise<void> {
+    await this.send(
+      parentEmail,
+      `Reminder: ${studentName}'s Skillseed Subscription Expires on ${expiryDate}`,
+      subscriptionExpiryWarningTemplate(
+        parentFirstName,
+        studentName,
+        expiryDate,
+        renewUrl,
+      ),
+    );
+  }
+
+  async sendExpiredSubscriptionEmail(
+    email: string,
+    firstName: string,
+  ): Promise<void> {
+    // Legacy shim — delegates to the new method
+    await this.sendSubscriptionExpiredEmail(email, firstName, 'your child');
   }
 
   async sendCredentialApprovedEmail(
     email: string,
     firstName: string,
     credentialType: string,
-  ) {
-    const credentialName =
-      credentialType === 'government_id'
-        ? 'Government ID'
-        : 'Professional Credentials';
-
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Your Credentials Have Been Approved',
-      html: `
-      <p>Hi ${firstName},</p>
-      <p>Great news! Your ${credentialName} has been <strong>approved</strong> by our team.</p>
-      <p>Your profile is now fully verified, which means you can access all mentor features on Skillseed.</p>
-      <p>Thank you for your cooperation during the verification process.</p>
-      <p>If you have any questions or need further assistance, please don't hesitate to contact us.</p>
-      <p>Best regards,</p>
-      <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Credential approval email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send credential approval email:', error);
-    }
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Your Credentials Have Been Approved',
+      credentialApprovedTemplate(firstName, credentialType),
+    );
   }
 
   async sendCredentialRejectedEmail(
@@ -228,81 +175,33 @@ export class EmailService {
     firstName: string,
     credentialType: string,
     rejectionReason: string,
-  ) {
-    const credentialName =
-      credentialType === 'government_id'
-        ? 'Government ID'
-        : 'Professional Credentials';
-
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Action Required: Your Credentials Were Not Approved',
-      html: `
-      <p>Hi ${firstName},</p>
-      <p>We've reviewed your ${credentialName} and unfortunately, we were unable to approve it at this time.</p>
-      <p><strong>Reason:</strong> ${rejectionReason || 'The submitted credentials did not meet our verification requirements.'}</p>
-      <p>Please log in to your account and upload a new document that addresses the issues mentioned above.</p>
-      <p>If you have any questions or need further clarification, please contact our support team for assistance.</p>
-      <p>Thank you for your understanding.</p>
-      <p>Best regards,</p>
-      <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Credential rejection email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send credential rejection email:', error);
-    }
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Action Required: Your Credentials Were Not Approved',
+      credentialRejectedTemplate(firstName, credentialType, rejectionReason),
+    );
   }
 
-  async sendMentorSuspensionEmail(firstName: string, email: string) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Your Skillseed Mentor Account Has Been Suspended',
-      html: `
-      <p>Hi ${firstName},</p>
-      <p>We're writing to inform you that your Skillseed mentor account has been temporarily suspended.</p>
-      <p>This suspension may be due to a policy violation, credential verification issue, or administrative review.</p>
-      <p>If you believe this action was taken in error or would like to discuss the reinstatement of your account, please contact our support team at support@skillseed.com.</p>
-      <p>Thank you for your understanding.</p>
-      <p>Best regards,</p>
-      <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Mentor suspension email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send mentor suspension email:', error);
-    }
+  async sendMentorSuspensionEmail(
+    firstName: string,
+    email: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Your Skillseed Mentor Account Has Been Suspended',
+      mentorSuspensionTemplate(firstName),
+    );
   }
 
-  async sendMentorReactivationEmail(firstName: string, email: string) {
-    const mailOptions = {
-      from: process.env.MAIL_FROM,
-      to: email,
-      subject: 'Good News! Your Skillseed Mentor Account Has Been Reactivated',
-      html: `
-      <p>Hi ${firstName},</p>
-      <p>We're pleased to inform you that your Skillseed mentor account has been reactivated.</p>
-      <p>You can now log in to your account and resume all mentor activities on the platform.</p>
-      <p>Thank you for your patience during this process.</p>
-      <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
-      <p>Best regards,</p>
-      <p><strong>The Skillseed Team</strong></p>
-      `,
-    };
-
-    try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Mentor reactivation email sent:', info.response);
-    } catch (error) {
-      console.error('❌ Failed to send mentor reactivation email:', error);
-    }
+  async sendMentorReactivationEmail(
+    firstName: string,
+    email: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Good News! Your Skillseed Mentor Account Has Been Reactivated',
+      mentorReactivationTemplate(firstName),
+    );
   }
 }

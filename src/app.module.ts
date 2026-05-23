@@ -45,6 +45,7 @@ import { ReportsModule } from './modules/reports/reports.module';
       },
       // envFilePath: process.env.NODE_ENV === 'production' ? '.env.development',
     }),
+    ScheduleModule.forRoot(),
     LoggerModule,
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

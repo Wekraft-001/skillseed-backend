@@ -8,7 +8,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { CreateAdminOrParentDto } from './dtos';
-import { User, UserDocument, School, Mentor } from '../schemas';
+import {
+  User,
+  UserDocument,
+  School,
+  Mentor,
+  Subscription,
+  SubscriptionDocument,
+} from '../schemas';
 import { JwtService } from '@nestjs/jwt';
 import { LoggerService } from 'src/common/logger/logger.service';
 import { UserRole } from 'src/common/interfaces';
@@ -22,6 +29,8 @@ export class AuthService {
     private readonly schoolModel: Model<School>,
     @InjectModel(Mentor.name)
     private readonly mentorModel: Model<Mentor>,
+    @InjectModel(Subscription.name)
+    private readonly subscriptionModel: Model<SubscriptionDocument>,
     private readonly jwtService: JwtService,
     private readonly logger: LoggerService,
   ) {
@@ -131,6 +140,32 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentails');
     }
 
+    const subscription = await this.subscriptionModel
+      .findOne({ child: childUser._id })
+      .lean()
+      .exec();
+
+    if (subscription) {
+      const isExpired =
+        !subscription.isActive || subscription.endDate < new Date();
+
+      if (isExpired) {
+        this.logger.warn(
+          `Child login blocked:subscription expired for student ${childUser._id}`,
+        );
+        throw new UnauthorizedException(
+          'Your subscription has expired. Please ask your parent to renew it to continue learning',
+        );
+      }
+    } else {
+      this.logger.warn(
+        `Child login blocked:no subscription found for student ${childUser._id}`,
+      );
+      throw new UnauthorizedException(
+        'No active subscription found. Please ask your parent to set up a subscription.',
+      );
+    }
+    
     const payload = {
       sub: childUser._id,
       firstName: childUser.firstName,

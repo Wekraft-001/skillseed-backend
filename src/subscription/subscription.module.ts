@@ -13,6 +13,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ParentDashboardModule } from 'src/modules/dashboard/parents/module/dashboard.module';
 import { SubscriptionMonitorService } from './subscription-monitor.service';
 import { EmailModule } from 'src/common/utils/mailing/email.module';
+import { SubscriptionExpiryScheduler } from './subscription-expiry.scheduler';
 
 @Module({
   imports: [
@@ -24,10 +25,14 @@ import { EmailModule } from 'src/common/utils/mailing/email.module';
     LoggerModule,
     HttpModule,
     ParentDashboardModule,
-    EmailModule
+    EmailModule,
   ],
   controllers: [SubscriptionController],
-  providers: [SubscriptionService, SubscriptionMonitorService],
+  providers: [
+    SubscriptionService,
+    SubscriptionMonitorService,
+    SubscriptionExpiryScheduler,
+  ],
   exports: [SubscriptionService],
 })
 export class SubscriptionModule {}

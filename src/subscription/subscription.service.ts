@@ -3,11 +3,13 @@ import {
   Logger,
   BadRequestException,
   HttpException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import {
   CreateSubscriptionDto,
+  PaymentMethod,
   PaymentStatus,
   SubscriptionStatus,
 } from 'src/common/interfaces';
@@ -361,9 +363,88 @@ export class SubscriptionService {
   }
 
   // Added for payment verification flow
-  async findSubscriptionByChildTempId(childTempId: string): Promise<SubscriptionDocument | null> {
+  async findSubscriptionByChildTempId(
+    childTempId: string,
+  ): Promise<SubscriptionDocument | null> {
     return this.subscriptionModel.findOne({
       childTempId: childTempId,
     });
+  }
+
+  // Subscription Renewal
+  async renewSubscription(
+    subscriptionId: string,
+    parentId: string,
+    paymentMethod: PaymentMethod = PaymentMethod.CREDIT_CARD,
+  ): Promise<{ paymentLink: string; reference: string }> {
+    // 1. Find the subscription and verify ownership
+    const existing = await this.subscriptionModel
+      .findOne({ _id: subscriptionId, user: parentId })
+      .populate<{ child: UserDocument }>('child')
+      .exec();
+
+    if (!existing) {
+      throw new NotFoundException(
+        'Subscription not found or does not belong to you',
+      );
+    }
+
+    const parent = await this.userModel.findById(parentId);
+    if (!parent) throw new NotFoundException('Parent not found');
+
+    // 2. Generate new transaction ref
+    const transactionRef = `renewal-${uuidv4()}`;
+
+    const customerData = {
+      amount: existing.amount,
+      currency: existing.currency || 'RWF',
+      tx_ref: transactionRef,
+      name: `${parent.firstName} ${parent.lastName}`,
+      phonenumber: `+250${parent.phoneNumber}`,
+      email: parent.email,
+      payment_options:
+        paymentMethod === PaymentMethod.MOBILE_MONEY
+          ? 'mobilemoneyrwanda'
+          : 'card',
+    };
+
+    // 3. Create hosted payment link via Flutterwave
+    const hostedPayment =
+      await this.paymentService.createFlutterwaveCustomer(customerData);
+    const hostedLink = hostedPayment.data?.link;
+
+    if (!hostedLink) {
+      throw new BadRequestException('Failed to generate renewal payment link');
+    }
+
+    // 4. Create a new pending subscription record for this renewal
+    //    It inherits the same child reference from the expired subscription.
+    const renewal = new this.subscriptionModel({
+      user: parentId,
+      child: existing.child?._id ?? existing.child ?? null,
+      transactionRef,
+      status: PaymentStatus.PENDING,
+      isActive: false,
+      amount: existing.amount,
+      currency: existing.currency || 'RWF',
+      startDate: new Date(),
+      // 30-day subscription — adjust as needed
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      paymentStatus: PaymentStatus.PENDING,
+      maxChildren: existing.maxChildren || 30,
+      payment_options: paymentMethod,
+      // Mark as a renewal so webhooks/jobs can handle it differently if needed
+      isRenewal: true,
+      previousSubscriptionId: existing._id,
+    });
+
+    await renewal.save();
+
+    this.logger.log(
+      `Renewal subscription ${renewal._id} created for parent ${parentId}, ` +
+        `child ${existing.child}, ref ${transactionRef}`,
+    );
+
+    return { paymentLink: hostedLink, reference: transactionRef };
   }
 }
