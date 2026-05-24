@@ -11,6 +11,8 @@ import {
   studentOnboardingParentTemplate,
   studentOnboardingSchoolTemplate,
   subscriptionExpiredTemplate,
+  contactAutoReplyTemplate,
+  contactFormTemplate,
 } from './template/index.template';
 
 @Injectable()
@@ -202,6 +204,30 @@ export class EmailService {
       email,
       'Good News! Your Skillseed Mentor Account Has Been Reactivated',
       mentorReactivationTemplate(firstName),
+    );
+  }
+
+  async sendContactFormEmail(data: {
+    senderName: string;
+    senderEmail: string;
+    phoneNumber?: string;
+    question: string;
+  }): Promise<void> {
+    await this.send(
+      'skillseed@wekraft.co',
+      `New Contact Form Submission from ${data.senderName}`,
+      contactFormTemplate(data),
+    );
+  }
+
+  async sendContactAutoReply(data: {
+    toEmail: string;
+    firstName: string;
+  }): Promise<void> {
+    await this.send(
+      data.toEmail,
+      'We received your message — Skillseed',
+      contactAutoReplyTemplate(data.firstName),
     );
   }
 }
