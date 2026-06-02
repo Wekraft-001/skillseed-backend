@@ -37,6 +37,7 @@ import { PostsService } from '../services/posts.service';
 import { RewardsModule } from 'src/modules/rewards/rewards.module';
 import { LearningProgressService } from '../services/learning-progress.service';
 import { CareerRecommendationService } from '../services/career-recommendation.service';
+import { AiChatService } from 'src/modules/ai-gateway/services';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { CareerRecommendationService } from '../services/career-recommendation.s
   ],
   providers: [
     StudentDashboardService,
+    AiChatService,
     StudentChallengesService,
     StudentCommunitiesService,
     CompletedChallengesService,

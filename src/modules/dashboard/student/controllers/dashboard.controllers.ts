@@ -29,6 +29,7 @@ import {
 } from '@nestjs/swagger';
 import { RewardsService } from 'src/modules/rewards/rewards.service';
 import { LearningProgressService } from '../services/learning-progress.service';
+import { AiChatService } from 'src/modules/ai-gateway/services';
 
 @Controller('student/dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -41,6 +42,7 @@ export class StudentDashboardController {
     private readonly logger: LoggerService,
     private readonly rewardsService: RewardsService,
     private readonly learningProgressService: LearningProgressService,
+    private readonly aiChatService: AiChatService,
   ) {}
 
   /**
@@ -213,5 +215,41 @@ export class StudentDashboardController {
     return this.learningProgressService.getLearningJourney(
       (student as any)._id.toString(),
     );
+  }
+
+  @Post('ai-chat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Chat with SkillSeed AI advisor' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['messages'],
+      properties: {
+        messages: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              role: { type: 'string', enum: ['user', 'assistant'] },
+              content: { type: 'string' },
+            },
+          },
+        },
+        ageRange: {
+          type: 'string',
+          enum: ['6-8', '9-12', '13-15', '16-18'],
+          nullable: true,
+        },
+      },
+    },
+  })
+  async aiChat(
+    @Body()
+    body: {
+      messages: { role: 'user' | 'assistant'; content: string }[];
+      ageRange?: string;
+    },
+  ) {
+    return this.aiChatService.chat(body.messages, body.ageRange);
   }
 }
